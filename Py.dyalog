@@ -17,9 +17,9 @@
             r←(⌽∨\⌽'/'=fname)/fname
         ∇
 
-        ∇ StartPython program;cmd
+        ∇ StartPython (program srvport);cmd
             :Access Public Shared
-            ⎕SH 'python ',pypath,' ',(⍕srvport),'>/home/marinus/log &'
+            ⎕SH 'python ',program,' ',(⍕srvport),'>/home/marinus/log &'
         ∇
 
         ∇ Kill pid
@@ -39,11 +39,11 @@
         :Field Private os
 
         :Field Private filename←'APLBridgeSlave.py'
-        
+
 
         :Section Network functions
             :Field Private attempts←10
-            
+
             ⍝ Find an open port and start a server on it
             ∇ port←StartServer;tryPort;rv
                 :For tryPort :In ⌽⍳65535
@@ -224,7 +224,7 @@
             pypath←(os.GetPath #.Py.ScriptPath),filename
 
             ⍝ start python
-            os.StartPython pypath
+            ⍝os.StartPython pypath srvport
 
             ready←1
 
