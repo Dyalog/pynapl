@@ -74,14 +74,20 @@ def handleMessages(sockfile):
                 stop=True
             elif mtype==MessageType.REPR:
                 print "REPR ",data
-                sendMessage(sockfile, MessageType.REPR, repr(eval(data)))
+                
+                try:
+                    val = repr(eval(data))
+                    sendMessage(sockfile, MessageType.REPR, val)
+                except Exception, e:
+                    sendMessage(sockfile, MessageType.ERR, "Python error: "+repr(e))
+                
             else:
                 print "???"
                 sendMessage(sockfile, MessageType.ERR, "invalid mtype %d" % mtype)
 
         except MalformedMessage, mm:
             print "Error: ", repr(mm)
-            sendMessage(MessageType.ERR, repr(mm))
+            sendMessage(sockfile, MessageType.ERR, repr(mm))
             stop=True
 
 def handle(sock):
