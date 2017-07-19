@@ -6,10 +6,13 @@
     attempts←10
 
     host←'localhost'
-    port←2526
+    ⍝port←2526
 
     ready←0
     threadno←⍬
+    
+    serverSocket←'SPy'
+    connSocket←'SPy'
 
 
     :Class UnixInterface
@@ -20,17 +23,56 @@
             r←(⌽∨\⌽'/'=fname)/fname
         ∇
 
-        ∇ StartPython program
+        ∇ StartPython program;cmd
             :Access Public
-            threadno←⎕SH&'python ',program
+            cmd←'python ',program
+            ⎕SH cmd
         ∇
     :EndClass
 
+
+    ⍝ Find an open port and start a server on it
+    ∇ port←StartServer;tryPort;rv
+        :For tryPort :In ⌽⍳65535
+            rv←⊃#.DRC.Srv serverSocket 'localhost' tryPort 'Raw'
+            :If rv=0
+                port←tryPort
+                ⎕←'Started server on port ',port
+                :Return
+            :EndIf
+        :EndFor
+        port←¯1
+    ∇
+    
+    ⍝ Wait for connection, set connSocket if connected
+    ∇ success←AcceptConnection;rc;rval
+        success←0
+        :Repeat
+            rc←⊃rval←#.DRC.Wait serverSocket
+            :If rc=0
+                ⎕←'Connection established'
+                connSocket←2⊃rval
+                ⎕←'Socket: ',connSocket
+                success←1
+                :Leave
+            :ElseIf rc=100
+                ⍝ Timeout
+                ⎕←'Timeout, retrying'
+            :Else
+                ⍝ Error
+                ⎕←'Socket error ' rval
+                success←0
+                :Leave
+            :EndIf            
+        :EndRepeat
+    ∇
 
     ⍝ Send Unicode message
     ∇ success←mtype USend data
         success←mtype Send 'UTF-8' ⎕UCS data
     ∇
+
+
 
     ⍝ Send message (as raw data)
     ∇ success←mtype Send data;send;sizefield
@@ -50,7 +92,7 @@
 
         sizefield←(4/256)⊤≢data
         ⍝ send the message
-        success←0=⊃⎕←#.DRC.Send 'CPy' (⎕←mtype,sizefield,data)
+        success←0=⊃⎕←#.DRC.Send connSocket (⎕←mtype,sizefield,data)
     ∇
 
     ⍝ debug function (eval/repr)
@@ -114,10 +156,11 @@
                 ⍝ (either a message or a header), so we need to read more
 
                 :Repeat
-                    rc←⊃wait_ret←#.DRC.Wait 'CPy'
+                    rc←⊃⎕←wait_ret←#.DRC.Wait connSocket
 
                     :If rc=0 ⍝ success
                         rc obj event sdata←wait_ret
+                        connSocket←obj
                         :Select event
                         :Case 'Block' ⍝ we have data
                             data ,← sdata
@@ -137,18 +180,18 @@
 
 
         :EndRepeat
-        
+
         →finish
-        
+
         error:
         (success mtype recv)←0 ¯1 sdata
         ready←0
-        
+
         finish:
     ∇
 
     ⍝ Initialization routine
-    ∇ Init;ok;tries;code;clt;success;_;msg;piducs
+    ∇ Init;ok;tries;code;clt;success;_;msg;srvport;piducs
         reading←0 ⋄ curlen←¯1 ⋄ data←'' ⋄ type←¯1
 
         ⍝ load Conga
@@ -158,37 +201,29 @@
 
         #.DRC.Init ''
 
+        ⍝ Attempt to start a server
+        ⎕←'Starting server'
+        srvport←StartServer
+        ⎕←'Server at ' srvport
+
         ⍝ find path
         os←⎕NEW UnixInterface
         pypath←(os.GetPath SALT_Data.SourceFile),filename
 
         ⍝ start python
-        ⍝os.StartPython pypath
-
-        ⍝ maximum amount of attempts
-        ok←0
-        :For _ :In ⍳attempts
-
-            clt←#.DRC.Clt 'CPy'  host port 'Raw' 1
-            code←⊃clt
-
-            ⍝ connection succeeded
-            :If code=0 ⋄ ok←1 ⋄ :Leave ⋄ :EndIf
-
-            ⍝ wait a second and try again
-            {}⎕DL 1
-            ⎕←'Trying again. ' _ clt
-        :EndFor
-
-        :If ~ok
-            ⎕←'Failed, giving up.'
-            →ready←0
-        :EndIf
+        ⍝{os.StartPython&⍵} pypath
+        ⎕SH 'python ',pypath,' ',(⍕srvport),'>/home/marinus/log &'
 
         ready←1
 
-        ⍝ Python server should now send PID
-        ⍞←'Waiting for receive... '
+        ⍝ Python client should now send PID
+        ⎕←'Waiting for connection... '
+        
+        :If ~AcceptConnection
+            ⎕←'Failure.'
+            →ready←0
+        :EndIf
+        
         success msg piducs←⎕←Recv
 
         :If ~success
@@ -196,7 +231,7 @@
             →ready←0
         :EndIf
 
-        success pid←⎕VFI ⎕UCS piducs
+        pid←⎕VFI ⎕UCS piducs
         :If ~success
             ⎕←'PID not a number'
             →ready←0
