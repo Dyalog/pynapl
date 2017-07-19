@@ -7,6 +7,7 @@
 #   TYPE  SIZE (big-endian)  MESSAGE (`size` bytes, expected to be UTF-8 encoded)
 
 import socket, os
+import Array
 
 class Message(object):
     """A message to be sent to the other side"""
@@ -15,7 +16,10 @@ class Message(object):
     PID=1      # initial message containing PID 
     STOP=2     # break the connection
     REPR=3     # evaluate expr, return repr (for debug)
+    EXEC=4     # execute statement(s), return OK or ERR
+
     
+    DBGSerializationRoundTrip = 253 # 
     DBG=254    # print message on stdout and send it back
     ERR=255    # Python error
 
@@ -25,7 +29,8 @@ class Message(object):
         """Initialize a message"""
         self.type = mtype
         self.data = mdata
-
+        if type(self.data) is unicode: 
+            self.data = self.data.encode("utf8")
         if len(self.data) > Message.MAX_LEN:
             raise ValueError("message body exceeds maximum length")
 
@@ -103,6 +108,31 @@ class Connection(object):
             except Exception, e:
                 Message(Message.ERR, repr(e)).send(self.sockfile)
 
+        elif t==Message.EXEC:
+            # execute some Python code in the global context
+            try:
+                code = compile(message.data, '<APL>', 'exec')
+                exec code in globals()
+                Message(Message.OK, '').send(self.sockfile)
+            except Exception, e:
+                Message(Message.ERR, repr(e)).send(self.sockfile)
+
+
+        elif t==Message.DBGSerializationRoundTrip:
+            # this is a debug message. Deserialize the contents, print them to stdout, reserialize and send back
+            try:
+                print "Received data: ", message.data
+                print "---------------"
+
+                aplarr = Array.APLArray.fromJSONString(message.data)
+                serialized = aplarr.toJSONString()
+
+                print "Sending back: ", serialized
+                print "---------------"
+
+                Message(Message.DBGSerializationRoundTrip, serialized).send(self.sockfile)
+            except IndexError, e: #Exception, e:
+                Message(Message.ERR, repr(e)).send(self.sockfile)
         else:
             Message(Message.ERR, "unknown message type #%d"%message.type).send(self.sockfile)
 
