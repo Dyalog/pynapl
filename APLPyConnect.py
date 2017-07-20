@@ -10,7 +10,7 @@
 import socket, os
 from Array import *
 
-class APLException(Exception): pass
+class APLError(Exception): pass
 class MalformedMessage(Exception): pass
 
 class Message(object):
@@ -21,10 +21,11 @@ class Message(object):
     STOP=2     # break the connection
     REPR=3     # evaluate expr, return repr (for debug)
     EXEC=4     # execute statement(s), return OK or ERR
+    REPRRET=5  # 
 
     EVAL=10    # evaluate a Python expression, including arguments, with APL conversion
     EVALRET=11 # message containing the result of an evaluation
-    
+   
     DBGSerializationRoundTrip = 253 # 
     DBG=254    # print message on stdout and send it back
     ERR=255    # Python error
@@ -79,10 +80,11 @@ class PyEvaluator(object):
     # If it's stupid and it works, it's still stupid, but at least it works
     wrapper=compile("retval = eval(code)",'<APL>','exec')
 
-    def __init__(self, expr, args):
+    def __init__(self, expr, args, conn):
         self.args=args
         self.pyargs=[]
         self.expr=expr
+        self.conn=conn
         self.__check_arg_lens_match()
         self.__expr_arg_subst()
 
@@ -107,12 +109,12 @@ class PyEvaluator(object):
 
     def __check_arg_lens_match(self):
         if self.args.rho[0] != sum(ch in u"⎕⍞" for ch in self.expr):
-            raise APLException("expression argument length mismatch")
+            raise TypeError("expression argument length mismatch")
 
             
 
     def go(self):
-        local = {'args':self.pyargs, 'retval':None, 'code':self.expr}
+        local = {'args':self.pyargs, 'retval':None, 'code':self.expr, 'APL':self.conn.apl}
         exec self.wrapper in globals(), local
         retval = local['retval']
         if not isinstance(retval, APLArray):
@@ -123,10 +125,52 @@ class PyEvaluator(object):
 
 class Connection(object):
     """A connection"""
-        
+    
+    class APL(object):
+        """Represents the APL interpreter."""
+        def __init__(self, conn):
+            self.conn=conn
+
+        def repr(self, aplcode):
+            """Run an APL expression, return string representation"""
+            
+            # send APL message
+            Message(Message.REPR, aplcode).send(self.conn.sockfile)
+            reply = self.conn.expect(Message.REPRRET)
+
+            if reply.type == Message.ERR:
+                raise APLError(reply.data)
+            else:
+                return reply.data
+
+        def eval(self, aplexpr, *args, **kwargs):
+            """Evaluate an APL expression. Any extra arguments will be exposed
+               as an array ∆. If `raw' is set, the result is not converted to a
+               Python representation."""
+           
+            if not type(aplexpr) is unicode:
+                # this should be an UTF-8 string
+                aplexpr=unicode(aplexpr, "utf8")
+
+            payload = APLArray.from_python([aplexpr, args]).toJSONString()
+            Message(Message.EVAL, payload).send(self.conn.sockfile)
+
+            reply = self.conn.expect(Message.EVALRET)
+
+            if reply.type == Message.ERR:
+                raise APLError(reply.data)
+
+            answer = APLArray.fromJSONString(reply.data)
+
+            if 'raw' in kwargs and kwargs['raw']:
+                return answer
+            else:
+                return answer.to_python()
+
     def __init__(self, socket, signon=True):
         self.socket = socket
         self.sockfile = socket.makefile()
+        self.apl = Connection.APL(self)
         if signon:
             Message(Message.PID, str(os.getpid())).send(self.sockfile)
 
@@ -135,6 +179,20 @@ class Connection(object):
         self.stop = False
         while not self.stop:
             self.respond(Message.recv(self.sockfile))
+
+    def expect(self, msgtype):
+        """Expect a certain type of message. If such a message or an error
+           is received, return it; if a different message is received, then
+           handle it and go back to waiting for the right type of message."""
+
+        while True:
+            msg = Message.recv(self.sockfile)
+
+            if msg.type in (msgtype, Message.ERR):
+                return msg
+            else:
+                respond(msg)
+
 
     def respond(self, message):
         """Respond to a message"""
@@ -157,7 +215,7 @@ class Connection(object):
             # evaluate the input and send the Python representation back
             try:
                 val = repr(eval(message.data))
-                Message(Message.REPR, val).send(self.sockfile)
+                Message(Message.REPRRET, val).send(self.sockfile)
             except Exception, e:
                 Message(Message.ERR, repr(e)).send(self.sockfile)
 
@@ -197,7 +255,7 @@ class Connection(object):
                 or len(val[[1]].rho) != 1:
                     raise MalformedMessage("Argument list must be rank-1 array.")
 
-                result = PyEvaluator(code, args).go().toJSONString()
+                result = PyEvaluator(code, args, self).go().toJSONString()
                 Message(Message.EVALRET, result).send(self.sockfile)
             except Exception, e:
                 Message(Message.ERR, repr(e)).send(self.sockfile)

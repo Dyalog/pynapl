@@ -43,7 +43,7 @@ class APLArray(object):
     def to_python(self):
         """Convert an APLArray to a Python object.
 
-        Multidimensional arrays will be split up row-by-row and returned as a nested list, \
+        Multidimensional arrays will be split up row-by-row and returned as a nested list, 
         as if one had done ↓."""
 
         if len(self.rho)==0: # scalar
@@ -181,7 +181,7 @@ class APLArray(object):
 
     def __init__(self, rho, data, type_hint=None):
         self.rho=rho
-        self.data=extend(data, product(rho))
+        self.data=extend(list(data), product(rho))
         # deduce type from data
         if not type_hint is None:
             # hint is given

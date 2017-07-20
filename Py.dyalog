@@ -38,7 +38,7 @@
         :Field Private PYERR←11   ⍝ error raised when Python returns an error
         :Field Private BROKEN←990 ⍝ error raised when the object is not in an usable state
         :Field Private BUGERR←15  ⍝ error raised when the cause is an internal bug
-        
+
         :Field Private ready←0
         :Field Private serverSocket←'SPy'
         :Field Private connSocket←⍬
@@ -160,6 +160,7 @@
                 STOP←2
                 REPR←3
                 EXEC←4
+                REPRRET←5
 
                 EVAL←10
                 EVALRET←11
@@ -191,7 +192,7 @@
                         :Return
                     :EndIf
                 :EndFor
-                
+
                 ⎕SIGNAL⊂('EN'BROKEN)('Message' 'Failed to start server')
             ∇
 
@@ -247,11 +248,26 @@
                 ⍝ TODO: this will handle incoming messages arising from
                 ⍝ a sent message if applicable
 
-                ok type data←URecv
+                :Repeat
+                    ok type data←URecv
 
-                :If ~ok
-                    ⎕←'Connection broken.'
-                :EndIf
+                    :If ~ok
+                        ready←0
+                        ⎕SIGNAL⊂('EN'BROKEN)('Message' 'Connection broken.')
+                        :Return
+                    :EndIf
+
+                    ⍝ if this is the expected message or an error message,
+                    ⍝ send it on
+                    :If type∊msgtype Msgs.ERR
+                        :Leave
+                    :Else
+                        ⍝ this is some other message that needs to be handled
+                        type HandleMsg data
+                        ⍝ afterwards we need to start listening for our message
+                        ⍝ again
+                    :EndIf
+                :EndRepeat
             ∇
 
             ⍝ Receive Unicode message
@@ -320,6 +336,72 @@
             ∇
         :EndSection
 
+
+
+
+
+        ⍝ Handle an incoming message
+        ∇ mtype HandleMsg mdata;in;expr;args;ns;rslt
+            :Select mtype
+
+                ⍝ 'OK' message
+                ⍝ There is no real reason for this to come in, but let's
+                ⍝ acknowledge it.
+            :Case Msgs.OK
+                Msgs.OK USend mdata
+
+                ⍝ 'STOP' message
+            :Case Msgs.STOP
+                Stop
+
+                ⍝ 'REPR' message
+            :Case Msgs.REPR
+                :Trap 0
+                    Msgs.REPRRET USend ⍕#⍎mdata
+                :Else
+                    Msgs.ERR USend ⍕⎕DMX.(EM Message)
+                :EndTrap
+
+                ⍝ 'EVAL' message
+            :Case Msgs.EVAL
+                :Trap 0
+
+                    in←deserialize mdata
+
+                    ⍝check message format
+                    :If 2≠≢in
+                        Msgs.ERR USend 'Malformed EVAL message'
+                        :Return
+                    :EndIf
+
+                    expr args←in
+
+                    ⍝namespace to run the expr in
+                    ns←⎕NS''
+                    ⍝ expose the arguments and this class for communication with Python
+                    ns.∆←args
+                    ns.py←⎕THIS 
+
+                    ⍝ send the result back
+                    rslt←ns⍎expr                   
+
+                    Msgs.EVALRET USend serialize rslt
+                :Else
+                    Msgs.ERR USend ⍕⎕DMX.(EM Message)
+                :EndTrap
+
+                ⍝ Debug serialization round trip
+            :Case Msgs.DBGSerializationRoundTrip
+                :Trap 0
+                    mtype USend serialize deserialize mdata
+                :Else
+                    Msgs.ERR USend ⍕⎕DMX.(EM Message)
+                :EndTrap
+
+            :Else
+                Msgs.ERR USend 'Message not implemented #',⍕mtype
+            :EndSelect
+        ∇
         ⍝ debug function (eval/repr)
         ∇ str←Repr code;mtype;recv
             :Access Public
@@ -328,9 +410,9 @@
             Msgs.REPR USend code
 
             ⍝receive message
-            mtype recv←Expect Msgs.REPR
+            mtype recv←Expect Msgs.REPRRET
 
-            :If mtype≠Msgs.REPR
+            :If mtype≠Msgs.REPRRET
                 ⎕←'Received non-repr message: ' mtype recv
                 →0
             :EndIf
@@ -403,7 +485,9 @@
                 'DRC'#.⎕CY 'conga.dws'
             :EndIf
 
-            #.DRC.Init ''
+            :If 0≠⊃#.DRC.Init ''
+                'Conga is unavailable.' ⎕SIGNAL BROKEN
+            :EndIf
 
             ⍝ Attempt to start a server
             srvport←StartServer
@@ -456,6 +540,7 @@
         ∇ Stop
             :Access Public Instance
             ⍝ send a Stop message, we don't care if it succeeds
+            ⎕←'Sending STOP'
             :Trap 0 ⋄ Msgs.STOP USend 'STOP' ⋄ :EndTrap
 
             {}⎕DL ÷4 ⍝give the Python instance a small time to finish up properly
