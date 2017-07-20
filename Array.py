@@ -4,6 +4,7 @@
 import operator
 import json
 import codecs
+import collections
 
 from Util import *
 
@@ -16,6 +17,10 @@ class APLArray(object):
     
     TYPE_HINT_NUM = 0
     TYPE_HINT_CHAR = 1
+
+    data=None
+    rho=None
+    type_hint=None
 
     # json decoder object hook
     def __json_object_hook(jsobj):
@@ -34,8 +39,57 @@ class APLArray(object):
     # define a reusable json decoder
     __json_decoder = json.JSONDecoder(encoding="utf8", object_hook=__json_object_hook)
 
+    # convert array to suitable-ish python representation
+    def to_python(self):
+        """Convert an APLArray to a Python object.
+
+        Multidimensional arrays will be split up row-by-row and returned as a nested list, \
+        as if one had done ↓."""
+
+        if len(self.rho)==0: # scalar
+            scalar = self.data[0]
+            if isinstance(scalar, APLArray): return scalar.to_python()
+            else: return scalar
+
+        elif len(self.rho)==1: # array
+            # if the type hint says characters, and the array is simple, return a string
+            if self.genTypeHint() == APLArray.TYPE_HINT_CHAR \
+            and not any(isinstance(x, APLArray) for x in self.data):
+                return ''.join(self.data)
+
+            # if not, return a list. If this is a nested array that _does_ have a simple
+            # string in it somewhere, *that* string *will* show up as a string within the
+            # converted object
+            else:
+                pylist = []
+                for item in self.data:
+                    if isinstance(item,APLArray): item=item.to_python()
+                    pylist.append(item)
+                return pylist
+
+        elif len(self.rho)>=2: # higher-rank array
+            # split the array until it is entirely flat
+            arr = self
+            # nocopy is safe here because arr is never modified
+            while arr.rho>0: arr=arr.split(nocopy=True)
+            # convert the flattened array to a python representation
+            return arr.to_python()
+
+        raise RuntimeError("rho < 0; rho=%d!" % self.rho)
+
+
     @staticmethod
     def from_python(obj, enclose=True):
+        """Create an APLArray from a Python object.
+        
+        Objects may be numbers, strings, or lists.
+
+        If the object is already an APLArray, it will be returned unchanged.
+        """
+
+        if isinstance(obj, APLArray):
+            return obj # it already is of the right type
+
         # lists, tuples and strings can be represented as vectors
         if type(obj) in (list,tuple):
             return APLArray(rho=[len(obj)], 
@@ -54,26 +108,73 @@ class APLArray(object):
             else:
                 aplstr = APLArray.from_python(list(obj))
                 aplstr.type_hint = APLArray.TYPE_HINT_CHAR
+                return aplstr
+
+        # if the object is iterable, but not one of the above, try making a list out of it
+        if isinstance(obj, collections.Iterable):
+            return APLArray.from_python(list(obj))
 
         # nothing else is supported for now
         raise TypeError("type not supported: " + repr(type(obj)))
 
+    def copy(self):
+        """Return an independent deep copy of the array."""
+        rho = self.rho
+        data = []
+        for item in self.data:
+            if isinstance(item, APLArray): data.append(item.copy())
+            else: data.append(item)
+
+        return APLArray(rho, data, self.genTypeHint())
+
+
+    def split(self, nocopy=False):
+        """APL ↓ - used by the conversion method
+        
+        If nocopy is set, no deep copy of the objects is made. This *will* leave
+        several arrays pointing into the same memory - be warned and do not mutate
+        the result if you use this. 
+        """
+
+        if len(self.rho)==0: return self if nocopy else self.copy() # no difference on scalars
+        elif len(self.rho)==1: 
+            # equivalent to enclose
+            arr=self if nocopy else self.copy()
+            return APLArray(rho=[], data=[self], type_hint=self.genTypeHint())
+        else:
+            newrho = self.rho[:-1]
+            blocksz = self.rho[-1]
+            nblocks = product(newrho)
+            newdata = []
+
+            for blockn in range(nblocks):
+                blockdata = []
+                offset = blocksz*blockn
+                for blockitem in range(blocksz):
+                    item = self.data[offset + blockitem]
+                    if isinstance(item, APLArray) and not nocopy: item=item.copy()
+                    blockdata.append(item)
+
+                newblocks.append(APLArray(rho=[blocksz], data=blockdata, type_hint=self.genTypeHint()))
+
+            return APLArray(rho=newrho, data=newdata, type_hint=self.genTypeHint())
+        
     def genTypeHint(self):
         if not self.type_hint is None:
             # it already exists
             return self.type_hint
-        elif len(data)!=0:
+        elif len(self.data)!=0:
             # we have some data to use
-            if isinstance(data[0], APLArray):
-                return data[0].getTypeHint()
-            elif type(data[0]) in (str,unicode):
-                return APLArray.TYPE_HINT_CHAR
+            if isinstance(self.data[0], APLArray):
+                self.type_hint = self.data[0].genTypeHint()
+            elif type(self.data[0]) in (str,unicode):
+                self.type_hint = APLArray.TYPE_HINT_CHAR
             else:
-                return APLArray.TYPE_HINT_NUM
+                self.type_hint = APLArray.TYPE_HINT_NUM
         else:
             # if we can't deduce anything, assume numeric empty vector
-            return APLArray.TYPE_HINT_NUM
-            
+            self.type_hint = APLArray.TYPE_HINT_NUM
+        return self.type_hint
 
     def __init__(self, rho, data, type_hint=None):
         self.rho=rho
@@ -102,7 +203,8 @@ class APLArray(object):
 
     def __setitem__(self,idx,val):
         self.check_valid_idx(idx)
-        self.data[self.flatten_idx(idx)]=val
+        # make sure that if arrays are added, they are converted transparently
+        self.data[self.flatten_idx(idx)]=APLArray.from_python(val,enclose=False)
 
     def toJSONString(self):
         return json.dumps(self, cls=ArrayEncoder, ensure_ascii=False)

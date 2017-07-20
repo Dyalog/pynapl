@@ -148,6 +148,9 @@
                 STOP←2
                 REPR←3
                 EXEC←4
+                
+                EVAL←10
+                EVALRET←11
 
                 DBGSerializationRoundTrip ← 253
                 DBG←254
@@ -323,6 +326,31 @@
             str←recv
         ∇
 
+        ⍝ evaluate Python code w/arguments
+        ∇ ret←expr Eval args;msg;mtype;recv;nargs
+            :Access Public
+            
+            ⍝ check if argument list length matches # of args in expr
+            
+            :If (nargs←+/expr∊'⎕⍞')≠≢args
+                (⍕'Expected'nargs'args but got'(≢args))⎕SIGNAL 5
+            :EndIf
+            
+            expr←,expr
+            args←,args
+            msg←serialize(expr args)
+
+            Msgs.EVAL USend msg
+            
+            mtype recv←Expect Msgs.EVALRET
+            
+            :If mtype=Msgs.EVALRET
+                ret←deserialize recv
+                :Return
+            :EndIf
+            
+            ('Unexpected: ',⍕mtype recv)⎕SIGNAL 90
+        ∇
 
         ⍝ execute Python code
         ∇ ok←Exec code;mtype;recv

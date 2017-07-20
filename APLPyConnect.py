@@ -1,4 +1,5 @@
 # APLPyConnect
+# -*- coding: utf-8 -*-
 
 # This module handles the passing of messages between the APL side and the Python side
 
@@ -7,7 +8,10 @@
 #   TYPE  SIZE (big-endian)  MESSAGE (`size` bytes, expected to be UTF-8 encoded)
 
 import socket, os
-import Array
+from Array import *
+
+class APLException(Exception): pass
+class MalformedMessage(Exception): pass
 
 class Message(object):
     """A message to be sent to the other side"""
@@ -18,6 +22,8 @@ class Message(object):
     REPR=3     # evaluate expr, return repr (for debug)
     EXEC=4     # execute statement(s), return OK or ERR
 
+    EVAL=10    # evaluate a Python expression, including arguments, with APL conversion
+    EVALRET=11 # message containing the result of an evaluation
     
     DBGSerializationRoundTrip = 253 # 
     DBG=254    # print message on stdout and send it back
@@ -67,6 +73,53 @@ class Message(object):
 
         return Message(mtype, data)
 
+class PyEvaluator(object):
+    """Evaluate a Python expression"""
+
+    # If it's stupid and it works, it's still stupid, but at least it works
+    wrapper=compile("retval = eval(code)",'<APL>','exec')
+
+    def __init__(self, expr, args):
+        self.args=args
+        self.pyargs=[]
+        self.expr=expr
+        self.__check_arg_lens_match()
+        self.__expr_arg_subst()
+
+    def __expr_arg_subst(self):
+        narg = 0
+        build = []
+        for ch in self.expr:
+            if ch in u'⎕⍞':
+                build.append('args[%d]' % narg)
+                curarg = self.args[[narg]]
+                if ch==u'⎕' and isinstance(curarg,APLArray):
+                    # this argument should be converted to a suitable Python representation
+                    self.pyargs.append(curarg.to_python())
+                else:
+                    self.pyargs.append(curarg)
+                    
+                narg+=1
+            else:
+                build.append(ch)
+
+        self.expr=compile(''.join(build), '<APL>', 'eval')
+
+    def __check_arg_lens_match(self):
+        if self.args.rho[0] != sum(ch in u"⎕⍞" for ch in self.expr):
+            raise APLException("expression argument length mismatch")
+
+            
+
+    def go(self):
+        local = {'args':self.pyargs, 'retval':None, 'code':self.expr}
+        exec self.wrapper in globals(), local
+        retval = local['retval']
+        if not isinstance(retval, APLArray):
+            retval = APLArray.from_python(retval)
+
+        return retval 
+        
 
 class Connection(object):
     """A connection"""
@@ -118,13 +171,45 @@ class Connection(object):
                 Message(Message.ERR, repr(e)).send(self.sockfile)
 
 
+        elif t==Message.EVAL:
+            # evaluate a Python expression with optional arguments
+            # expected input: APLArray, first elem = expr string, 2nd elem = arguments
+            # output, if not an APLArray already, will be automagically converted
+
+            try:
+                print "received: ", message.data
+
+                val = APLArray.fromJSONString(message.data)
+                # unpack code
+                if val.rho != [2]: 
+                    raise MalformedMessage("EVAL expects a ⍴=2 array, but got: %s" % repr(val.rho))
+
+                if not isinstance(val[[0]], APLArray):
+                    raise MalformedMessage("First argument must contain code string.")
+
+                code = val[[0]].to_python()
+                if not type(code) in (str,unicode):
+                    raise MalformedMessage("Code element must be a string, but got: %s" % repr(code))
+
+                # unpack arguments
+                args = val[[1]]
+                if not isinstance(val[[1]], APLArray) \
+                or len(val[[1]].rho) != 1:
+                    raise MalformedMessage("Argument list must be rank-1 array.")
+
+                result = PyEvaluator(code, args).go().toJSONString()
+                Message(Message.EVALRET, result).send(self.sockfile)
+            except Exception, e:
+                Message(Message.ERR, repr(e)).send(self.sockfile)
+
+
         elif t==Message.DBGSerializationRoundTrip:
             # this is a debug message. Deserialize the contents, print them to stdout, reserialize and send back
             try:
                 print "Received data: ", message.data
                 print "---------------"
 
-                aplarr = Array.APLArray.fromJSONString(message.data)
+                aplarr = APLArray.fromJSONString(message.data)
                 serialized = aplarr.toJSONString()
 
                 print "Sending back: ", serialized
