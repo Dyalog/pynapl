@@ -14,14 +14,19 @@ class APLArray(object):
     Every element of the array must be either a value or another array. 
     """
     
+    TYPE_HINT_NUM = 0
+    TYPE_HINT_CHAR = 1
+
     # json decoder object hook
     def __json_object_hook(jsobj):
         # if this is an APL array, return it as such
         
         if type(jsobj) is dict \
-        and 'rho' in jsobj \
-        and 'data' in jsobj:
-            return APLArray(jsobj['rho'], list(jsobj['data']))
+        and 'r' in jsobj \
+        and 'd' in jsobj:
+            type_hint = APLArray.TYPE_HINT_NUM
+            if 't' in jsobj: type_hint = jsobj['t']
+            return APLArray(jsobj['r'], list(jsobj['d']), type_hint=type_hint)
 
         else:
             return jsobj
@@ -38,24 +43,47 @@ class APLArray(object):
         
         # numbers can be represented as numbers, enclosed if at the upper level so we always send an 'array'
         elif type(obj) in (int,long,float): # complex not supported for now
-            if enclose: return APLArray(rho=[], data=[obj])
+            if enclose: return APLArray(rho=[], data=[obj], type_hint=APLArray.TYPE_HINT_NUM)
             else: return obj
 
         # a one-element string is a character, a multi-element string is a vector
-        elif type(obj) is str:
+        elif type(obj) in (str,unicode):
             if len(obj) == 1:
-                if enclose: return APLArray(rho=[], data=[obj])
+                if enclose: return APLArray(rho=[], data=[obj], type_hint=APLArray.TYPE_HINT_CHAR)
                 else: return obj
             else:
-                return APLArray.from_python(list(obj))
+                aplstr = APLArray.from_python(list(obj))
+                aplstr.type_hint = APLArray.TYPE_HINT_CHAR
 
         # nothing else is supported for now
         raise TypeError("type not supported: " + repr(type(obj)))
 
+    def genTypeHint(self):
+        if not self.type_hint is None:
+            # it already exists
+            return self.type_hint
+        elif len(data)!=0:
+            # we have some data to use
+            if isinstance(data[0], APLArray):
+                return data[0].getTypeHint()
+            elif type(data[0]) in (str,unicode):
+                return APLArray.TYPE_HINT_CHAR
+            else:
+                return APLArray.TYPE_HINT_NUM
+        else:
+            # if we can't deduce anything, assume numeric empty vector
+            return APLArray.TYPE_HINT_NUM
+            
 
-    def __init__(self, rho, data):
+    def __init__(self, rho, data, type_hint=None):
         self.rho=rho
         self.data=extend(data, product(rho))
+        # deduce type from data
+        if not type_hint is None:
+            # hint is given
+            self.type_hint = type_hint
+        else:
+            self.type_hint = self.genTypeHint()
 
     def flatten_idx(self, idx, IO=0):
         return sum((x-IO)*(y-IO) for x,y in zip(scan_reverse(operator.__mul__,self.rho[1:]+[1]), idx))
@@ -87,7 +115,7 @@ class APLArray(object):
 class ArrayEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, APLArray):
-            return {"rho": obj.rho, "data": obj.data}
+            return {"r": obj.rho, "d": obj.data, "t":obj.genTypeHint()}
         else:
             return json.JSONEncoder.default(obj)
 

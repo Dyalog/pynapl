@@ -19,7 +19,7 @@
 
         ∇ StartPython (program srvport);cmd
             :Access Public Shared
-            ⎕SH 'python ',program,' ',(⍕srvport),'>/home/marinus/log &'
+            ⎕SH 'python ',program,' ',(⍕srvport),'>/dev/null &'
         ∇
 
         ∇ Kill pid
@@ -42,12 +42,17 @@
 
         :Field Private filename←'APLBridgeSlave.py'
 
+        ⍝ the debug constructor will set this, so the program will wait
+        ⍝ to connect to an external APLBridgeSlave.py rather than launch
+        ⍝ one.
+        :Field Private debugConnect←0
+
         ⍝ JSON serialization/deserialization
         :Section JSON serialization/deserialization
             ⍝ Check whether an array is serializable
             serializable←{
                 ⍝ for an array to be serializable, each of its elements
-                ⍝ when assigned to a variable must result in ⎕NC=1
+                ⍝ when assigned to a variable must result in ⎕NC=2
                 ⊃2∧.={w←⍵ ⋄ ⎕NC'w'}¨∊⍵
             }
 
@@ -59,8 +64,28 @@
 
                     wrap←{
                         n←⎕NS''
-                        n.rho←⍴⍵
-                        n.data←,⍺⍺¨⍵
+                        n.r←⍴⍵
+                        n.d←,⍺⍺¨⍵
+
+                        ⍝ type_hint: 1 if characters, 0 if numbers
+                        ⍝ (python cannot otherwise tell the difference
+                        ⍝ if the list is empty)
+                        n.t←{
+                            dat←n.d
+                            
+                            ⍝empty array: type is 1 if char prototype
+                            0=≢dat: ' '=⊃0↑dat
+                            
+                            ⍝nested array: type is that of nested array
+                            dat←⊃dat
+                            9=⎕NC'dat':dat.t
+                            
+                            ⍝array w/simple value: type of simple value
+                            2=⎕NC'dat':' '=⊃0↑dat
+                            
+                            ('? ⎕NC=',⍕⎕NC'dat' ) ⎕SIGNAL 16
+                        }⍬
+                        
                         n
                     }
 
@@ -75,9 +100,21 @@
                 {
                     w←⍵
                     ⍝ if not a JSON object, leave it alone
-                    0∨.≥⎕NC'w.data' 'w.rho':⍵
+                    0∨.≥⎕NC'w.d' 'w.r':⍵
 
-                    w.rho⍴∇¨⊃¨w.data
+                    ⍝ if array is empty and type_hint is
+                    ⍝ available, use it to construct an empty array
+                    ⍝ of the right type
+                    (0=≢w.d)∧0≠⎕NC'w.t':{
+                        ⍝ 0 = numbers
+                        0=⍵.t: ⍵.r⍴⍬
+                        1=⍵.t: ⍵.r⍴''
+
+                        ('Invalid type hint: ',⍕⍵.t)⎕SIGNAL 11 
+                    }w
+
+                    ⍝ reconstruct the array as given
+                    w.r⍴∇¨⊃¨w.d
                 } ⎕JSON ⍵
             }
 
@@ -130,7 +167,12 @@
                     :If 0=⊃rv
                         port←tryPort
                         serverSocket←2⊃rv
-                        ⎕←'Started server ',serverSocket,' on port ',port
+
+                        ⍝ debug output
+                        :If debugConnect
+                            ⎕←'Started server ',serverSocket,' on port ',port
+                        :EndIf
+
                         :Return
                     :EndIf
                 :EndFor
@@ -142,9 +184,7 @@
                 :Repeat
                     rc←⊃rval←#.DRC.Wait serverSocket
                     :If rc=0
-                        ⎕←'Connection established'
                         connSocket←2⊃rval
-                        ⎕←'Socket: ',connSocket
                         :Leave
                     :ElseIf rc=100
                         ⍝ Timeout
@@ -311,16 +351,15 @@
             #.DRC.Init ''
 
             ⍝ Attempt to start a server
-            ⎕←'Starting server'
             srvport←StartServer
-            ⎕←'Server at ' srvport
 
-
+            ⍝ start Python
             pypath←(os.GetPath #.Py.ScriptPath),filename
-
-            ⍝ start python
-            ⍝os.StartPython pypath srvport
-
+            
+            :If ~debugConnect
+                os.StartPython pypath srvport
+            :EndIf
+            
             ready←1
 
             ⍝ Python client should now send PID
@@ -344,6 +383,18 @@
             :Access Public Instance
             :Implements Constructor
 
+            Init
+        ∇
+        
+        ⍝ debug constructor
+        ∇ debugConstruct dbgparam;dC
+            :Access Public Instance
+            :Implements Constructor
+            
+            :If 'DEBUG'≡⊃dbgparam
+                debugConnect←2⊃dbgparam
+            :EndIf
+            
             Init
         ∇
 
