@@ -71,7 +71,7 @@ class APLArray(object):
             # split the array until it is entirely flat
             arr = self
             # nocopy is safe here because arr is never modified
-            while arr.rho>0: arr=arr.split(nocopy=True)
+            while len(arr.rho)>0: arr=arr.split(nocopy=True)
             # convert the flattened array to a python representation
             return arr.to_python()
 
@@ -100,6 +100,10 @@ class APLArray(object):
             if enclose: return APLArray(rho=[], data=[obj], type_hint=APLArray.TYPE_HINT_NUM)
             else: return obj
 
+        # boolean scalars should convert to ints for APL's sake
+        elif type(obj) is bool:
+            return APLArray.from_python(int(obj))
+
         # a one-element string is a character, a multi-element string is a vector
         elif type(obj) in (str,unicode):
             if len(obj) == 1:
@@ -126,7 +130,6 @@ class APLArray(object):
             else: data.append(item)
 
         return APLArray(rho, data, self.genTypeHint())
-
 
     def split(self, nocopy=False):
         """APL ↓ - used by the conversion method
@@ -155,7 +158,7 @@ class APLArray(object):
                     if isinstance(item, APLArray) and not nocopy: item=item.copy()
                     blockdata.append(item)
 
-                newblocks.append(APLArray(rho=[blocksz], data=blockdata, type_hint=self.genTypeHint()))
+                newdata.append(APLArray(rho=[blocksz], data=blockdata, type_hint=self.genTypeHint()))
 
             return APLArray(rho=newrho, data=newdata, type_hint=self.genTypeHint())
         

@@ -34,11 +34,18 @@
 
         when←/⍨
 
+        ⍝ errors
+        :Field Private PYERR←11   ⍝ error raised when Python returns an error
+        :Field Private BROKEN←990 ⍝ error raised when the object is not in an usable state
+        :Field Private BUGERR←15  ⍝ error raised when the cause is an internal bug
+        
         :Field Private ready←0
         :Field Private serverSocket←'SPy'
         :Field Private connSocket←⍬
         :Field Private pid←¯1
         :Field Private os
+
+        :Field Private lastError←''
 
         :Field Private filename←'APLBridgeSlave.py'
 
@@ -46,6 +53,11 @@
         ⍝ to connect to an external APLBridgeSlave.py rather than launch
         ⍝ one.
         :Field Private debugConnect←0
+
+        ∇ r←GetLastError
+            :Access Public
+            r←lastError
+        ∇
 
         ⍝ JSON serialization/deserialization
         :Section JSON serialization/deserialization
@@ -72,20 +84,20 @@
                         ⍝ if the list is empty)
                         n.t←{
                             dat←n.d
-                            
+
                             ⍝empty array: type is 1 if char prototype
                             0=≢dat: ' '=⊃0↑dat
-                            
+
                             ⍝nested array: type is that of nested array
                             dat←⊃dat
                             9=⎕NC'dat':dat.t
-                            
+
                             ⍝array w/simple value: type of simple value
                             2=⎕NC'dat':' '=⊃0↑dat
-                            
+
                             ('? ⎕NC=',⍕⎕NC'dat' ) ⎕SIGNAL 16
                         }⍬
-                        
+
                         n
                     }
 
@@ -148,7 +160,7 @@
                 STOP←2
                 REPR←3
                 EXEC←4
-                
+
                 EVAL←10
                 EVALRET←11
 
@@ -179,7 +191,8 @@
                         :Return
                     :EndIf
                 :EndFor
-                'Failed to start server' ⎕SIGNAL 90   
+                
+                ⎕SIGNAL⊂('EN'BROKEN)('Message' 'Failed to start server')
             ∇
 
             ⍝ Wait for connection, set connSocket if connected
@@ -194,7 +207,7 @@
                         ⎕←'Timeout, retrying'
                     :Else
                         ⍝ Error
-                        (⍕'Socket error ' rval) ⎕SIGNAL 90
+                        ⎕SIGNAL⊂('EN'BROKEN)('Message' (⍕'Socket error' rval))
                         :Leave
                     :EndIf            
                 :EndRepeat
@@ -207,7 +220,7 @@
 
             ⍝ Send message (as raw data)
             ∇ mtype Send data;send;sizefield;rc
-                'Inactive instance' ⎕SIGNAL 90 when ~ready
+                'Inactive instance' ⎕SIGNAL BROKEN when ~ready
 
                 ⍝ construct data to  send
 
@@ -224,7 +237,7 @@
                 ⍝ send the message
                 rc←#.DRC.Send connSocket (mtype,sizefield,data)
                 :If 0≠⊃rc
-                    ('Socket error ',⍕rc) ⎕SIGNAL 90 
+                    ('Socket error ',⍕rc) ⎕SIGNAL BROKEN
                 :EndIf
             ∇
 
@@ -250,7 +263,7 @@
             ⍝ Receive message.
             ⍝ Message fmt: X L L L L Data
             ∇ (success mtype recv)←Recv;done;wait_ret;rc;obj;event;sdata;tmp
-                'Inactive instance' ⎕SIGNAL 90 when ~ready
+                'Inactive instance' ⎕SIGNAL BROKEN when ~ready
 
 
                 :Repeat
@@ -267,7 +280,7 @@
                         curdata ↓⍨← curlen
                         ⍝ therefore, we are no longer reading a message
                         reading←0
-                        →finish
+                        :Return
                     :Else
                         ⍝ we don't currently have enough data for what we need
                         ⍝ (either a message or a header), so we need to read more
@@ -298,13 +311,12 @@
 
                 :EndRepeat
 
-                →finish
+                :Return
 
                 error:
                 (success mtype recv)←0 ¯1 sdata
                 ready←0
 
-                finish:
             ∇
         :EndSection
 
@@ -329,39 +341,54 @@
         ⍝ evaluate Python code w/arguments
         ∇ ret←expr Eval args;msg;mtype;recv;nargs
             :Access Public
-            
+
             ⍝ check if argument list length matches # of args in expr
-            
+
             :If (nargs←+/expr∊'⎕⍞')≠≢args
                 (⍕'Expected'nargs'args but got'(≢args))⎕SIGNAL 5
             :EndIf
-            
+
             expr←,expr
             args←,args
             msg←serialize(expr args)
 
             Msgs.EVAL USend msg
-            
+
             mtype recv←Expect Msgs.EVALRET
-            
+
             :If mtype=Msgs.EVALRET
                 ret←deserialize recv
                 :Return
             :EndIf
-            
-            ('Unexpected: ',⍕mtype recv)⎕SIGNAL 90
+
+            ⍝ catch error message
+            :If mtype=Msgs.ERR
+                lastError←recv
+                ⎕SIGNAL⊂('EN'PYERR)('Message' recv)
+                :Return
+            :EndIf
+
+            ⍝ this shouldn't happen and is an internal bug
+            ('Unexpected: ',⍕mtype recv)⎕SIGNAL BUGERR
         ∇
 
         ⍝ execute Python code
-        ∇ ok←Exec code;mtype;recv
+        ∇ Exec code;mtype;recv
             :Access Public
             Msgs.EXEC USend code
 
             mtype recv←Expect Msgs.OK
 
-            :If mtype≠Msgs.OK
-                ⎕←'Received non-OK message: ' mtype recv
+            :If mtype=Msgs.OK
+                :Return
+            :ElseIf mtype=Msgs.ERR
+                lastError←recv
+                ⎕SIGNAL⊂('EN'PYERR)('Message' recv)
+                :Return
             :EndIf
+
+            ⍝ this shouldn't happen and is an internal bug
+            ('Unexpected: ',⍕mtype recv)⎕SIGNAL BUGERR
         ∇
 
         ⍝ Initialization routine
@@ -383,11 +410,11 @@
 
             ⍝ start Python
             pypath←(os.GetPath #.Py.ScriptPath),filename
-            
+
             :If ~debugConnect
                 os.StartPython pypath srvport
             :EndIf
-            
+
             ready←1
 
             ⍝ Python client should now send PID
@@ -413,16 +440,16 @@
 
             Init
         ∇
-        
+
         ⍝ debug constructor
         ∇ debugConstruct dbgparam;dC
             :Access Public Instance
             :Implements Constructor
-            
+
             :If 'DEBUG'≡⊃dbgparam
                 debugConnect←2⊃dbgparam
             :EndIf
-            
+
             Init
         ∇
 
