@@ -21,8 +21,8 @@ class Message(object):
     STOP=2     # break the connection
     REPR=3     # evaluate expr, return repr (for debug)
     EXEC=4     # execute statement(s), return OK or ERR
-    REPRRET=5  # 
-
+    REPRRET=5  # return from "REPR"
+    
     EVAL=10    # evaluate a Python expression, including arguments, with APL conversion
     EVALRET=11 # message containing the result of an evaluation
    
@@ -191,7 +191,7 @@ class Connection(object):
             if msg.type in (msgtype, Message.ERR):
                 return msg
             else:
-                respond(msg)
+                self.respond(msg)
 
 
     def respond(self, message):
@@ -223,6 +223,7 @@ class Connection(object):
             # execute some Python code in the global context
             try:
                 code = compile(message.data, '<APL>', 'exec')
+                globals()['APL']=self.apl
                 exec code in globals()
                 Message(Message.OK, '').send(self.sockfile)
             except Exception, e:
@@ -275,7 +276,7 @@ class Connection(object):
 
                 Message(Message.DBGSerializationRoundTrip, serialized).send(self.sockfile)
             except IndexError, e: #Exception, e:
-                Message(Message.ERR, repr(e)).send(self.sockfile)
+                Message(Message.ERR, repr(e)).send(self.sockfile)          
         else:
-            Message(Message.ERR, "unknown message type #%d"%message.type).send(self.sockfile)
+            Message(Message.ERR, "unknown message type #%d / data:%s"%(message.type,message.data)).send(self.sockfile)
 

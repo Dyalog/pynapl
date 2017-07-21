@@ -17,9 +17,17 @@
             r←(⌽∨\⌽'/'=fname)/fname
         ∇
 
-        ∇ StartPython (program srvport);cmd
+        ∇ {py} StartPython (program srvport);cmd;pypath
             :Access Public Shared
-            ⎕SH 'python ',program,' ',(⍕srvport),'>/dev/null &'
+            :If 2=⎕NC'py'
+            :andif 0≠≢py
+                ⍝use given path
+                pypath←py,('/'≠⊃⌽py)/'/'
+            :else
+                pypath←'' ⍝ this will make it use the path
+            :endif
+
+            ⎕SH pypath,'python ',program,' ',(⍕srvport),'>/dev/null &'
         ∇
 
         ∇ Kill pid
@@ -40,13 +48,22 @@
             r←(⌽∨\⌽'\'=fname)/fname
         ∇
         
-        ∇ StartPython (program srvport);pypath
+        ∇ {py} StartPython (program srvport);pypath
             :Access Public Instance
             ⎕USING←'System.Diagnostics,System.dll'
             ⎕USING,←⊂'Microsoft.Win32,mscorlib.dll' 
+                    
+            :If 2=⎕NC'py' 
+            :andIf 0≠≢py
+                ⍝ use given path
+                pypath←py
+            :ElseIf 0=≢pypath←FindPythonInRegistry 
+                ⍝ can't find it in registry either
+                ⎕SIGNAL('EN'999)('Message' 'Cannot find Python in registry.')
+            :EndIf
             
-            pypath←FindPythonInRegistry
-            
+
+            :Trap 90
             pyProcess←⎕NEW Process
             pyProcess.StartInfo.FileName←pypath,'\python.exe' ⍝ better have it on your path!
             pyProcess.StartInfo.Arguments←program,' ',⍕srvport  
@@ -54,8 +71,10 @@
             pyProcess.StartInfo.RedirectStandardError←1 
             pyProcess.StartInfo.UseShellExecute←0
             pyProcess.StartInfo.CreateNoWindow←1  
-           ⍝ pyProcess.WindowStyle←ProcessWindowStyle.Hidden
-            pyProcess.Start ⍬
+            {}pyProcess.Start ⍬
+            :Else
+                ⎕SIGNAL⊂('EN'999)('Message' 'Cannot start Python')
+            :EndTrap
         ∇
                  
         ∇ path←FindPythonInRegistry;rk;rka;rkb;comp;ver
@@ -130,6 +149,8 @@
         :Field Private lastError←''
 
         :Field Private filename←'APLBridgeSlave.py'
+        
+        :Field Private pypath←''
 
         ⍝ the debug constructor will set this, so the program will wait
         ⍝ to connect to an external APLBridgeSlave.py rather than launch
@@ -556,7 +577,7 @@
         ∇
 
         ⍝ Initialization routine
-        ∇ Init;ok;tries;code;clt;success;_;msg;srvport;piducs
+        ∇ Init;ok;tries;code;clt;success;_;msg;srvport;piducs;spath
             reading←0 ⋄ curlen←¯1 ⋄ curdata←'' ⋄ curtype←¯1
 
             ⍝ check OS
@@ -579,10 +600,10 @@
             srvport←StartServer
 
             ⍝ start Python
-            pypath←(os.GetPath #.Py.ScriptPath),filename
+            spath←(os.GetPath #.Py.ScriptPath),filename
 
             :If ~debugConnect
-                os.StartPython pypath srvport
+                pypath os.StartPython spath srvport
             :EndIf
 
             ready←1
@@ -610,16 +631,25 @@
             Init
         ∇
 
-        ⍝ debug constructor
-        ∇ debugConstruct dbgparam;dC
+        ⍝ param constructor 
+        ⍝ this takes a (param value) vector of vectors
+        ∇ paramConstruct param;dC;par;val
             :Access Public Instance
             :Implements Constructor
             
-            ⎕←'DEBUG Constructor'
-            :If 'DEBUG'≡⊃dbgparam
-                debugConnect←2⊃dbgparam
-            :EndIf
+            ⍝ if only one parameter, enclose the vector
+            param←⊂⍣(2=|≡param)⊢param
+            
+            :For (par val) :In param
+                :Select par
+                ⍝ debug parameter
+                :Case'Debug' ⋄ debugConnect←val
+                ⍝ pass in the path to the python interpreter explicitly
+                :Case'PyPath' ⋄ pypath←val 
+                :EndSelect
 
+            :EndFor
+            
             Init
         ∇
 
@@ -634,8 +664,10 @@
             ⍝ shut down the server 
             {}#.DRC.Close serverSocket 
 
-            ⍝ try to kill the process we started, in case it has not properly exited
-            os.Kill pid
+            :If ~debugConnect
+            ⍝ try to kill the process we started, in case it has not properly exited    
+               os.Kill pid      
+            :EndIf
 
             ⍝ we are no longer ready for commands
             ready←0
