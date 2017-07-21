@@ -300,8 +300,6 @@ class Connection(object):
             # output, if not an APLArray already, will be automagically converted
 
             try:
-                print "received: ", message.data
-
                 val = APLArray.fromJSONString(message.data)
                 # unpack code
                 if val.rho != [2]: 
