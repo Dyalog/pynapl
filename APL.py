@@ -5,8 +5,8 @@
 import Array
 import APLPyConnect
 
-def APL():
+def APL(debug=False):
     """Start an APL interpreter"""
-    return APLPyConnect.Connection.APLClient()
+    return APLPyConnect.Connection.APLClient(DEBUG=debug)
 
 APLArray = Array.APLArray

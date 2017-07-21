@@ -60,12 +60,15 @@
     :Class WindowsInterface
         ⍝ Functions to interface with Windows using .NET
         ⍝ NOTE: will keep track of the process itself rather than use the pid as in Linux
+              
+        :Using System.Diagnostics,System.dll
+        :Using Microsoft.Win32,mscorlib.dll
 
         :Field Private Instance pyProcess←⍬
 
         ∇ r←GetPID
-            :Access Public Instance
-            'Not Implemented' ⎕SIGNAL 15
+            :Access Public Instance     
+            r←Process.GetCurrentProcess.Id
         ∇
 
         ∇ r←GetPath fname
@@ -75,8 +78,8 @@
 
         ∇ {py} StartPython (program srvport);pypath
             :Access Public Instance
-            ⎕USING←'System.Diagnostics,System.dll'
-            ⎕USING,←⊂'Microsoft.Win32,mscorlib.dll' 
+            ⍝⎕USING←'System.Diagnostics,System.dll'
+            ⍝⎕USING,←⊂'Microsoft.Win32,mscorlib.dll' 
 
             :If 2=⎕NC'py' 
             :andIf 0≠≢py
