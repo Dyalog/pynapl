@@ -7,7 +7,8 @@
 #   0     1  2  3  4         ......
 #   TYPE  SIZE (big-endian)  MESSAGE (`size` bytes, expected to be UTF-8 encoded)
 
-import socket, os
+import socket, os, time
+import RunDyalog
 from Array import *
 
 class APLError(Exception): pass
@@ -142,7 +143,8 @@ class Connection(object):
                 Message(Message.STOP, "STOP").send(self.conn.sockfile)
                 # give the APL process half a second to exit cleanly
                 time.sleep(.5)
-                # TODO: kill it if not dead yet
+                try: os.kill(self.pid, 15) # SIGTERM
+                except OSError: pass # just leak the instance, it will be cleaned up once Python exits
                 self.pid=0
             else: 
                 raise ValueError("Connection was not started from the Python end.")
@@ -198,7 +200,7 @@ class Connection(object):
                 return answer.to_python()
 
     @staticmethod
-    def APLClient(DEBUG=True):
+    def APLClient(DEBUG=False):
         """Start an APL client. This function returns an APL instance."""
         
         # start a server
@@ -209,6 +211,9 @@ class Connection(object):
 
         if DEBUG:print "Waiting for connection at %d" % port
         srvsock.listen(1)
+        
+        if not DEBUG: RunDyalog.dystart(port)
+
         conn, _ = srvsock.accept()
 
         if DEBUG:print "Waiting for PID..."

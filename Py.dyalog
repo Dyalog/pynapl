@@ -11,7 +11,6 @@
 
     ⍝ Start an APL slave and connect to the server at the given port
     ∇StartAPLSlave port;py
-        ⎕←'Starting...'
         py←⎕NEW Py ('Client' port)
     ∇
 
@@ -732,7 +731,6 @@
         ∇ Stop
             :Access Public Instance
             ⍝ send a Stop message, we don't care if it succeeds
-            ⎕←'Sending STOP'
             :Trap 0 ⋄ Msgs.STOP USend 'STOP' ⋄ :EndTrap
 
             :If 0≠≢serverSocket
