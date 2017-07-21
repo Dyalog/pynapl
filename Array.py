@@ -105,7 +105,7 @@ class APLArray(object):
             return APLArray.from_python(int(obj))
 
         # a one-element string is a character, a multi-element string is a vector
-        elif type(obj) in (str,unicode):
+        elif type(obj) is unicode:
             if len(obj) == 1:
                 if enclose: return APLArray(rho=[], data=[obj], type_hint=APLArray.TYPE_HINT_CHAR)
                 else: return obj
@@ -113,6 +113,10 @@ class APLArray(object):
                 aplstr = APLArray.from_python(list(obj))
                 aplstr.type_hint = APLArray.TYPE_HINT_CHAR
                 return aplstr
+
+        elif type(obj) is str:
+            # a non-unicode string will be encoded as UTF-8
+            return APLArray.from_python(unicode(obj, "utf8"))
 
         # if the object is iterable, but not one of the above, try making a list out of it
         if isinstance(obj, collections.Iterable):
