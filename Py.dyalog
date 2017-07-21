@@ -22,12 +22,17 @@
             :If 2=⎕NC'py'
             :andif 0≠≢py
                 ⍝use given path
-                pypath←py,('/'≠⊃⌽py)/'/'
+                pypath←py
             :else
-                pypath←'' ⍝ this will make it use the path
+                ⍝find python on path
+                :Trap 11
+                    pypath←⊃⎕SH'which python'
+                :Else
+                    ⎕SIGNAL⊂('EN'999)('Message' 'Cannot find Python on the path.')
+                :EndTrap
             :endif
 
-            ⎕SH pypath,'python ',program,' ',(⍕srvport),'>/dev/null &'
+            ⎕SH pypath,' ',program,' ',(⍕srvport),'>/dev/null &'
         ∇
 
         ∇ Kill pid
@@ -35,72 +40,72 @@
             ⎕SH 'kill ', ⍕pid
         ∇
     :EndClass     
-                   
+
 
     :Class WindowsInterface
         ⍝ Functions to interface with Windows using .NET
         ⍝ NOTE: will keep track of the process itself rather than use the pid as in Linux
-            
+
         :Field Private Instance pyProcess←⍬
 
         ∇ r←GetPath fname
             :Access Public Shared
             r←(⌽∨\⌽'\'=fname)/fname
         ∇
-        
+
         ∇ {py} StartPython (program srvport);pypath
             :Access Public Instance
             ⎕USING←'System.Diagnostics,System.dll'
             ⎕USING,←⊂'Microsoft.Win32,mscorlib.dll' 
-                    
+
             :If 2=⎕NC'py' 
             :andIf 0≠≢py
                 ⍝ use given path
                 pypath←py
             :ElseIf 0=≢pypath←FindPythonInRegistry 
                 ⍝ can't find it in registry either
-                ⎕SIGNAL('EN'999)('Message' 'Cannot find Python in registry.')
+                ⎕SIGNAL⊂('EN'999)('Message' 'Cannot find Python in registry.')
             :EndIf
-            
+
 
             :Trap 90
-            pyProcess←⎕NEW Process
-            pyProcess.StartInfo.FileName←pypath,'\python.exe' ⍝ better have it on your path!
-            pyProcess.StartInfo.Arguments←program,' ',⍕srvport  
-            pyProcess.StartInfo.RedirectStandardOutput←1
-            pyProcess.StartInfo.RedirectStandardError←1 
-            pyProcess.StartInfo.UseShellExecute←0
-            pyProcess.StartInfo.CreateNoWindow←1  
-            {}pyProcess.Start ⍬
+                pyProcess←⎕NEW Process
+                pyProcess.StartInfo.FileName←pypath
+                pyProcess.StartInfo.Arguments←program,' ',⍕srvport  
+                pyProcess.StartInfo.RedirectStandardOutput←1
+                pyProcess.StartInfo.RedirectStandardError←1 
+                pyProcess.StartInfo.UseShellExecute←0
+                pyProcess.StartInfo.CreateNoWindow←1  
+                {}pyProcess.Start ⍬
             :Else
                 ⎕SIGNAL⊂('EN'999)('Message' 'Cannot start Python')
             :EndTrap
         ∇
-                 
+
         ∇ path←FindPythonInRegistry;rk;rka;rkb;comp;ver
             :Access Public Shared
             ⍝ attempt to find Python in the registry
             ⍝ (see: https://www.python.org/dev/peps/pep-0514/)
-            
+
             ⍝ first position: HKEY_CURRENT_USER/Software/Python  
             rka←Registry.CurrentUser   
             rka←rka.OpenSubKey('Software' 0)  ⋄ →('[Null]'≡⍕rka)/localmachine 
             rkb←rka.OpenSubKey('Python' 0)    ⋄ →('[Null]'≡⍕rkb)/localmachine 
             rk←rkb ⋄ →foundPython
-            
+
             localmachine:
             ⍝ second postion: HKEY_LOCAL_MACHINE/Software/Python      
             rka←Registry.LocalMachine                     
             rka←rka.OpenSubKey('Software' 0)  ⋄ →('[Null]'≡⍕rka)/fail 
             rkb←rka.OpenSubKey('Python'   0)  ⋄ →('[Null]'≡⍕rkb)/wow6234 
             rk←rkb ⋄ →foundPython
-            
+
             wow6234:
             ⍝ third position: HKEY_LOCAL_MACHINE/Software/WOW6234Node/Python 
             rkb←rka.OpenSubKey('WOW6432Node' 0) ⋄ →('[Null]'≡⍕rkb)/fail
             rka←rkb.OpenSubKey('Python' 0)    ⋄ →('[Null]'≡⍕rka)/fail
             rk←rka ⋄ →foundPython
-            
+
             foundPython:
             comp←⊃rk.GetSubKeyNames
             rk←rk.OpenSubKey(comp 0)          ⋄ →('[Null]'≡⍕rk)/fail
@@ -108,6 +113,8 @@
             rk←rk.OpenSubKey(ver 0)           ⋄ →('[Null]'≡⍕rk)/fail    
             rk←rk.OpenSubKey('InstallPath' 0) ⋄ →('[Null]'≡⍕rk)/fail
             path←rk.GetValue⊂''
+            path,←'\python.exe'
+            
             :Return
 
             fail:
@@ -125,9 +132,9 @@
                 pyProcess.Kill ⍬                             
             :EndTrap
         ∇           
-        
-        
-                
+
+
+
     :EndClass
 
     ⍝ Connect to 
@@ -149,7 +156,7 @@
         :Field Private lastError←''
 
         :Field Private filename←'APLBridgeSlave.py'
-        
+
         :Field Private pypath←''
 
         ⍝ the debug constructor will set this, so the program will wait
@@ -617,7 +624,7 @@
                 ⎕←'PID not a number'
                 →ready←0
             :EndIf
-   
+
             :If debugConnect
                 ⎕←'OK! pid=',pid
             :EndIf
@@ -636,20 +643,20 @@
         ∇ paramConstruct param;dC;par;val
             :Access Public Instance
             :Implements Constructor
-            
+
             ⍝ if only one parameter, enclose the vector
             param←⊂⍣(2=|≡param)⊢param
-            
+
             :For (par val) :In param
                 :Select par
-                ⍝ debug parameter
+                    ⍝ debug parameter
                 :Case'Debug' ⋄ debugConnect←val
-                ⍝ pass in the path to the python interpreter explicitly
+                    ⍝ pass in the path to the python interpreter explicitly
                 :Case'PyPath' ⋄ pypath←val 
                 :EndSelect
 
             :EndFor
-            
+
             Init
         ∇
 
@@ -665,8 +672,8 @@
             {}#.DRC.Close serverSocket 
 
             :If ~debugConnect
-            ⍝ try to kill the process we started, in case it has not properly exited    
-               os.Kill pid      
+                ⍝ try to kill the process we started, in case it has not properly exited    
+                os.Kill pid      
             :EndIf
 
             ⍝ we are no longer ready for commands
