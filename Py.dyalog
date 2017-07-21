@@ -26,8 +26,90 @@
             :Access Public Shared
             ⎕SH 'kill ', ⍕pid
         ∇
-    :EndClass
+    :EndClass     
+                   
 
+    :Class WindowsInterface
+        ⍝ Functions to interface with Windows using .NET
+        ⍝ NOTE: will keep track of the process itself rather than use the pid as in Linux
+            
+        :Field Private Instance pyProcess←⍬
+
+        ∇ r←GetPath fname
+            :Access Public Shared
+            r←(⌽∨\⌽'\'=fname)/fname
+        ∇
+        
+        ∇ StartPython (program srvport);pypath
+            :Access Public Instance
+            ⎕USING←'System.Diagnostics,System.dll'
+            ⎕USING,←⊂'Microsoft.Win32,mscorlib.dll' 
+            
+            pypath←FindPythonInRegistry
+            
+            pyProcess←⎕NEW Process
+            pyProcess.StartInfo.FileName←pypath,'\python.exe' ⍝ better have it on your path!
+            pyProcess.StartInfo.Arguments←program,' ',⍕srvport  
+            pyProcess.StartInfo.RedirectStandardOutput←1
+            pyProcess.StartInfo.RedirectStandardError←1 
+            pyProcess.StartInfo.UseShellExecute←0
+            pyProcess.StartInfo.CreateNoWindow←1  
+           ⍝ pyProcess.WindowStyle←ProcessWindowStyle.Hidden
+            pyProcess.Start ⍬
+        ∇
+                 
+        ∇ path←FindPythonInRegistry;rk;rka;rkb;comp;ver
+            :Access Public Shared
+            ⍝ attempt to find Python in the registry
+            ⍝ (see: https://www.python.org/dev/peps/pep-0514/)
+            
+            ⍝ first position: HKEY_CURRENT_USER/Software/Python  
+            rka←Registry.CurrentUser   
+            rka←rka.OpenSubKey('Software' 0)  ⋄ →('[Null]'≡⍕rka)/localmachine 
+            rkb←rka.OpenSubKey('Python' 0)    ⋄ →('[Null]'≡⍕rkb)/localmachine 
+            rk←rkb ⋄ →foundPython
+            
+            localmachine:
+            ⍝ second postion: HKEY_LOCAL_MACHINE/Software/Python      
+            rka←Registry.LocalMachine                     
+            rka←rka.OpenSubKey('Software' 0)  ⋄ →('[Null]'≡⍕rka)/fail 
+            rkb←rka.OpenSubKey('Python'   0)  ⋄ →('[Null]'≡⍕rkb)/wow6234 
+            rk←rkb ⋄ →foundPython
+            
+            wow6234:
+            ⍝ third position: HKEY_LOCAL_MACHINE/Software/WOW6234Node/Python 
+            rkb←rka.OpenSubKey('WOW6432Node' 0) ⋄ →('[Null]'≡⍕rkb)/fail
+            rka←rkb.OpenSubKey('Python' 0)    ⋄ →('[Null]'≡⍕rka)/fail
+            rk←rka ⋄ →foundPython
+            
+            foundPython:
+            comp←⊃rk.GetSubKeyNames
+            rk←rk.OpenSubKey(comp 0)          ⋄ →('[Null]'≡⍕rk)/fail
+            ver←⊃{('2'=⊃¨⍵)/⍵}rk.GetSubKeyNames ⍝ version 2.x
+            rk←rk.OpenSubKey(ver 0)           ⋄ →('[Null]'≡⍕rk)/fail    
+            rk←rk.OpenSubKey('InstallPath' 0) ⋄ →('[Null]'≡⍕rk)/fail
+            path←rk.GetValue⊂''
+            :Return
+
+            fail:
+            path←''
+            :Return
+
+        ∇
+        ∇ Kill ignored
+            ⍝ the rest of the program will pass a PID in for both OSes,
+            ⍝ in Windows we don't need it, so we ignore it.
+            :Access Public Instance  
+            :Trap 90
+                ⍝ The process is supposed to exit on its own, so there's a good chance
+                ⍝ this will give an exception, thus the trap.
+                pyProcess.Kill ⍬                             
+            :EndTrap
+        ∇           
+        
+        
+                
+    :EndClass
 
     ⍝ Connect to 
     :Class Py
@@ -178,7 +260,7 @@
 
             ⍝ Find an open port and start a server on it
             ∇ port←StartServer;tryPort;rv
-                :For tryPort :In ⌽⍳65535
+                :For tryPort :In ⌽⍳50000 ⍝ 65535
                     rv←#.DRC.Srv '' 'localhost' tryPort 'Raw'
                     :If 0=⊃rv
                         port←tryPort
@@ -477,8 +559,12 @@
         ∇ Init;ok;tries;code;clt;success;_;msg;srvport;piducs
             reading←0 ⋄ curlen←¯1 ⋄ curdata←'' ⋄ curtype←¯1
 
-            ⍝ the OS is assumed to be Unix for now
-            os←⎕NEW UnixInterface
+            ⍝ check OS
+            :If ∨/'Windows'⍷⊃#.⎕WG'APLVersion'
+                os←⎕NEW #.Py.WindowsInterface
+            :Else
+                os←⎕NEW UnixInterface
+            :EndIf
 
             ⍝ load Conga
             :If 0=⎕NC'#.DRC'
@@ -502,19 +588,18 @@
             ready←1
 
             ⍝ Python client should now send PID
-            ⎕←'Waiting for connection... '
-
             AcceptConnection
 
-            msg piducs←⎕←Expect Msgs.PID
-
+            msg piducs←Expect Msgs.PID
             success pid←⎕VFI piducs
             :If ~success
                 ⎕←'PID not a number'
                 →ready←0
             :EndIf
-
-            ⎕←'OK! pid='pid     
+   
+            :If debugConnect
+                ⎕←'OK! pid=',pid
+            :EndIf
 
         ∇
 
@@ -529,7 +614,8 @@
         ∇ debugConstruct dbgparam;dC
             :Access Public Instance
             :Implements Constructor
-
+            
+            ⎕←'DEBUG Constructor'
             :If 'DEBUG'≡⊃dbgparam
                 debugConnect←2⊃dbgparam
             :EndIf
