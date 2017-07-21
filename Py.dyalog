@@ -9,8 +9,24 @@
         r←SALT_Data.SourceFile
     ∇
 
+    ⍝ Start an APL slave and connect to the server at the given port
+    ∇StartAPLSlave port;py
+        ⎕←'Starting...'
+        py←⎕NEW Py ('Client' port)
+    ∇
+
     :Class UnixInterface
         ⍝ Functions to interface with Unix OSes
+
+        ∇ r←GetPID
+            :Access Public Shared
+            ⍝ get current process ID
+            :If 0=⎕NC'#.NonWindows.GetPID'
+                'NonWindows'#.⎕CY'quadna.dws'
+                #.NonWindows.Setup
+            :EndIf
+            r←#.NonWindows.GetPID
+        ∇
 
         ∇ r←GetPath fname
             :Access Public Shared
@@ -47,6 +63,11 @@
         ⍝ NOTE: will keep track of the process itself rather than use the pid as in Linux
 
         :Field Private Instance pyProcess←⍬
+
+        ∇ r←GetPID
+            :Access Public Instance
+            'Not Implemented' ⎕SIGNAL 15
+        ∇
 
         ∇ r←GetPath fname
             :Access Public Shared
@@ -114,7 +135,7 @@
             rk←rk.OpenSubKey('InstallPath' 0) ⋄ →('[Null]'≡⍕rk)/fail
             path←rk.GetValue⊂''
             path,←'\python.exe'
-            
+
             :Return
 
             fail:
@@ -148,7 +169,7 @@
         :Field Private BUGERR←15  ⍝ error raised when the cause is an internal bug
 
         :Field Private ready←0
-        :Field Private serverSocket←'SPy'
+        :Field Private serverSocket←⍬
         :Field Private connSocket←⍬
         :Field Private pid←¯1
         :Field Private os
@@ -159,6 +180,10 @@
 
         :Field Private pypath←''
 
+        ⍝ this holds the namespace in which APL code sent from the Python side
+        ⍝ will be evaluated.
+        :Field Private pyaplns←⍬
+        
         ⍝ the debug constructor will set this, so the program will wait
         ⍝ to connect to an external APLBridgeSlave.py rather than launch
         ⍝ one.
@@ -286,6 +311,30 @@
             :Field Private curtype←¯1
             :Field Private reading←0
 
+            ⍝ Run a client on a given a port
+            ∇ RunClient port;rv;ok;msg;data
+
+                rv←#.DRC.Clt '' 'localhost' port 'Raw'
+                :If 0=⊃rv
+                    ⍝ connection established
+                    connSocket←2⊃rv
+                    ready←1
+
+                    ⍝ send out the PID message
+                    Msgs.PID USend ⍕os.GetPID
+
+                    ⍝ handle incoming messages
+                    :Repeat
+                        ok msg data←URecv
+                        :If ~ok ⋄ :Leave ⋄ :EndIf
+                        msg HandleMsg data
+                    :Until ~ready
+                :Else
+                    ⎕←rv
+                    'Connection to Python server failed.'⎕SIGNAL BROKEN
+                :EndIf
+
+            ∇
             ⍝ Find an open port and start a server on it
             ∇ port←StartServer;tryPort;rv
                 :For tryPort :In ⌽⍳50000 ⍝ 65535
@@ -487,13 +536,13 @@
                     expr args←in
 
                     ⍝namespace to run the expr in
-                    ns←⎕NS''
+                    
                     ⍝ expose the arguments and this class for communication with Python
-                    ns.∆←args
-                    ns.py←⎕THIS 
+                    pyaplns.∆←args
+                    pyaplns.py←⎕THIS 
 
                     ⍝ send the result back
-                    rslt←ns⍎expr                   
+                    rslt←pyaplns⍎expr                   
 
                     Msgs.EVALRET USend serialize rslt
                 :Else
@@ -583,10 +632,11 @@
             ('Unexpected: ',⍕mtype recv)⎕SIGNAL BUGERR
         ∇
 
-        ⍝ Initialization routine
-        ∇ Init;ok;tries;code;clt;success;_;msg;srvport;piducs;spath
+        ⍝ Initialization common to the server and the client
+        ∇ InitCommon
             reading←0 ⋄ curlen←¯1 ⋄ curdata←'' ⋄ curtype←¯1
-
+            pyaplns←⎕NS''
+            
             ⍝ check OS
             :If ∨/'Windows'⍷⊃#.⎕WG'APLVersion'
                 os←⎕NEW #.Py.WindowsInterface
@@ -601,7 +651,18 @@
 
             :If 0≠⊃#.DRC.Init ''
                 'Conga is unavailable.' ⎕SIGNAL BROKEN
-            :EndIf
+            :EndIf          
+        ∇
+
+        ⍝ Client initialization routine
+        ∇ InitClient port
+            InitCommon
+            RunClient port
+        ∇
+
+        ⍝ Initialization routine
+        ∇ InitServer;ok;tries;code;clt;success;_;msg;srvport;piducs;spath
+            InitCommon
 
             ⍝ Attempt to start a server
             srvport←StartServer
@@ -635,29 +696,37 @@
             :Access Public Instance
             :Implements Constructor
 
-            Init
+            InitServer
         ∇
 
         ⍝ param constructor 
         ⍝ this takes a (param value) vector of vectors
-        ∇ paramConstruct param;dC;par;val
+        ∇ paramConstruct param;dC;par;val;clport
             :Access Public Instance
             :Implements Constructor
 
             ⍝ if only one parameter, enclose the vector
             param←⊂⍣(2=|≡param)⊢param
 
+            clport←0
             :For (par val) :In param
                 :Select par
                     ⍝ debug parameter
                 :Case'Debug' ⋄ debugConnect←val
                     ⍝ pass in the path to the python interpreter explicitly
                 :Case'PyPath' ⋄ pypath←val 
+                    ⍝ construct a client instead of a server
+                :Case 'Client' ⋄ clport←val
+
                 :EndSelect
 
             :EndFor
 
-            Init
+            :If 0=clport
+                InitServer
+            :Else
+                InitClient clport
+            :EndIf
         ∇
 
         ∇ Stop
@@ -666,15 +735,22 @@
             ⎕←'Sending STOP'
             :Trap 0 ⋄ Msgs.STOP USend 'STOP' ⋄ :EndTrap
 
-            {}⎕DL ÷4 ⍝give the Python instance a small time to finish up properly
+            :If 0≠≢serverSocket
+                ⍝ This is a server, so do the necessary clean-up
 
-            ⍝ shut down the server 
-            {}#.DRC.Close serverSocket 
+                {}⎕DL ÷4 ⍝give the Python instance a small time to finish up properly
 
-            :If ~debugConnect
-                ⍝ try to kill the process we started, in case it has not properly exited    
-                os.Kill pid      
-            :EndIf
+                ⍝ shut down the server 
+                {}#.DRC.Close serverSocket 
+
+                :If ~debugConnect
+                    ⍝ try to kill the process we started, in case it has not properly exited    
+                    os.Kill pid      
+                :EndIf
+            :Else
+                ⍝ close the client socket
+                {}#.DRC.Close connSocket
+            :EndIF
 
             ⍝ we are no longer ready for commands
             ready←0

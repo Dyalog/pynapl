@@ -25,7 +25,7 @@ class Message(object):
     
     EVAL=10    # evaluate a Python expression, including arguments, with APL conversion
     EVALRET=11 # message containing the result of an evaluation
-   
+
     DBGSerializationRoundTrip = 253 # 
     DBG=254    # print message on stdout and send it back
     ERR=255    # Python error
@@ -126,10 +126,29 @@ class PyEvaluator(object):
 class Connection(object):
     """A connection"""
     
+    pid=None
+
     class APL(object):
         """Represents the APL interpreter."""
         def __init__(self, conn):
             self.conn=conn
+
+        def stop(self):
+            """If the connection was initiated from the Python side, this will close it."""
+            if not self.pid is None:
+                # already killed it? (destructor might call this function after the user has called it as well)
+                if self.pid == 0: 
+                    return
+                Message(Message.STOP, "STOP").send(self.conn.sockfile)
+                # give the APL process half a second to exit cleanly
+                time.sleep(.5)
+                # TODO: kill it if not dead yet
+                self.pid=0
+            else: 
+                raise ValueError("Connection was not started from the Python end.")
+
+        def __del__(self):
+            if self.pid: self.stop()
 
         def repr(self, aplcode):
             """Run an APL expression, return string representation"""
@@ -143,6 +162,17 @@ class Connection(object):
             else:
                 return reply.data
 
+        def fix(self, code):
+            """2⎕FIX an APL script. It will become available in the workspace.
+               Input may be a string or a list."""
+
+            # implemented using eval 
+
+            if type(code) in (str,unicode):
+                code = code.split("\n") # luckily APL has no multiline strings
+            
+            return self.eval("2⎕FIX ∆", *code)
+                
         def eval(self, aplexpr, *args, **kwargs):
             """Evaluate an APL expression. Any extra arguments will be exposed
                as an array ∆. If `raw' is set, the result is not converted to a
@@ -166,6 +196,35 @@ class Connection(object):
                 return answer
             else:
                 return answer.to_python()
+
+    @staticmethod
+    def APLClient(DEBUG=True):
+        """Start an APL client. This function returns an APL instance."""
+        
+        # start a server
+        srvsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        srvsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        srvsock.bind(('localhost', 0))
+        _, port = srvsock.getsockname()
+
+        if DEBUG:print "Waiting for connection at %d" % port
+        srvsock.listen(1)
+        conn, _ = srvsock.accept()
+
+        if DEBUG:print "Waiting for PID..."
+        connobj = Connection(conn, signon=False)
+
+        # ask for the PID
+        pidmsg = connobj.expect(Message.PID)
+        
+        if pidmsg.type==Message.ERR:
+            raise APLError(pidmsg.data)
+        else:
+            pid=int(pidmsg.data)
+            if DEBUG:print "Ok! pid=%d" % pid
+            apl = connobj.apl
+            apl.pid = pid
+            return apl
 
     def __init__(self, socket, signon=True):
         self.socket = socket
