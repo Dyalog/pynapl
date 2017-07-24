@@ -10,3 +10,4 @@ def APL(debug=False):
     return APLPyConnect.Connection.APLClient(DEBUG=debug)
 
 APLArray = Array.APLArray
+APLError = APLPyConnect.APLError

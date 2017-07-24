@@ -60,7 +60,7 @@
     :Class WindowsInterface
         ⍝ Functions to interface with Windows using .NET
         ⍝ NOTE: will keep track of the process itself rather than use the pid as in Linux
-              
+
         :Using System.Diagnostics,System.dll
         :Using Microsoft.Win32,mscorlib.dll
 
@@ -185,7 +185,7 @@
         ⍝ this holds the namespace in which APL code sent from the Python side
         ⍝ will be evaluated.
         :Field Private pyaplns←⍬
-        
+
         ⍝ the debug constructor will set this, so the program will wait
         ⍝ to connect to an external APLBridgeSlave.py rather than launch
         ⍝ one.
@@ -502,7 +502,7 @@
 
 
         ⍝ Handle an incoming message
-        ∇ mtype HandleMsg mdata;in;expr;args;ns;rslt
+        ∇ mtype HandleMsg mdata;in;expr;args;ns;rslt;lines
             :Select mtype
 
                 ⍝ 'OK' message
@@ -518,11 +518,24 @@
                 ⍝ 'REPR' message
             :Case Msgs.REPR
                 :Trap 0
-                    Msgs.REPRRET USend ⍕#⍎mdata
+                    Msgs.REPRRET USend ⍕pyaplns⍎mdata
                 :Else
                     Msgs.ERR USend ⍕⎕DMX.(EM Message)
                 :EndTrap
 
+                ⍝ 'EXEC' message
+            :Case Msgs.EXEC
+
+                ⍝ split the message by newlines
+                pyaplns.∆∆∆∆∆←(mdata=⎕ucs 10 13)⊆mdata
+                :Trap 0
+                    pyaplns⍎'2⎕FIX ∆∆∆∆∆'
+                    Msgs.OK USend ''
+                :Else
+                    Msgs.ERR USend ⍕⎕DMX.(EM Message)
+                :EndTrap
+                
+                
                 ⍝ 'EVAL' message
             :Case Msgs.EVAL
                 :Trap 0
@@ -538,7 +551,7 @@
                     expr args←in
 
                     ⍝namespace to run the expr in
-                    
+
                     ⍝ expose the arguments and this class for communication with Python
                     pyaplns.∆←args
                     pyaplns.py←⎕THIS 
@@ -638,7 +651,7 @@
         ∇ InitCommon
             reading←0 ⋄ curlen←¯1 ⋄ curdata←'' ⋄ curtype←¯1
             pyaplns←⎕NS''
-            
+
             ⍝ check OS
             :If ∨/'Windows'⍷⊃#.⎕WG'APLVersion'
                 os←⎕NEW #.Py.WindowsInterface

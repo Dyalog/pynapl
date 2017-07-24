@@ -152,6 +152,24 @@ class Connection(object):
         def __del__(self):
             if self.pid: self.stop()
 
+        def fn(self, aplfn, raw=False):
+            """Expose an APL function to Python.
+
+            The result will be considered niladic if called with no arguments,
+            monadic if called with one and dyadic if called with two.
+            
+            If "raw" is set, the return value will be given as an APLArray rather
+            than be converted to a 'suitable' Python representation.
+            """
+
+            def __fn(*args):
+                if len(args)==0: return self.eval(aplfn)
+                if len(args)==1: return self.eval("(%s)⊃∆"%aplfn, args[0])
+                if len(args)==2: return self.eval("(⊃∆)(%s)2⊃∆"%aplfn, args[0], args[1])
+                return APLError("Function must be niladic, monadic or dyadic.")
+
+            return __fn
+
         def repr(self, aplcode):
             """Run an APL expression, return string representation"""
             
