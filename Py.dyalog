@@ -47,7 +47,7 @@
                 :EndTrap
             :endif
             ⎕SH pypath,' ',program,' ',(⍕srvport),' >/dev/null &'
-            
+
         ∇
 
         ∇ Kill pid
@@ -600,9 +600,6 @@
 
             ⍝ check if argument list length matches # of args in expr
 
-            :If (nargs←+/expr∊'⎕⍞')≠≢args
-                (⍕'Expected'nargs'args but got'(≢args))⎕SIGNAL 5
-            :EndIf
 
             expr←,expr
             args←,args
