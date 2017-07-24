@@ -18,7 +18,16 @@
 
     ⍝ Retrieve the path from the namespace
     ∇r←ScriptPath
-        r←SALT_Data.SourceFile
+        ⍝r←SALT_Data.SourceFile
+        
+        ⍝ Adám's SourceFile function
+        r←{ ⍝ Get pathname to sourcefile for item ⍵
+     c←⎕NC⊂,⍕⍵
+     c=2.1:(SALT_Var_Data.VD[;1]⍳⊂⍵(⊢,~)'#.')⊃SALT_Var_Data.VD[;2],⊂''
+     c∊3.1 3.2 4.1 4.2:1↓⊃('§'∘=⊂⊢)∊¯2↑⎕NR ⍵
+     (r←326=⎕DR ⍵)∨c∊9+0.1×⍳8:{6::'' ⋄ ''≡f←⊃(4∘⊃¨(/⍨)(⍵≡⊃)¨)5177⌶⍬:⍵.SALT_Data.SourceFile ⋄ f}⍎⍣(~r)⊢⍵
+     ''
+ }⎕THIS
     ∇
 
     ⍝ Start an APL slave and connect to the server at the given port
