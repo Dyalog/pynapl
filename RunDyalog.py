@@ -4,18 +4,22 @@
 import os, thread
 from subprocess import Popen, PIPE
 
+SCRIPTFILE=os.path.realpath(__file__)
+
 script="""
     ⎕PW←32767
-    {}2⎕FIX'file://Py.dyalog'
+    {}2⎕FIX'file://%s'
     port←%d
     Py.StartAPLSlave port
     )OFF
 """
 
 def dythread(port, dyalog="dyalog"):
+    # find the path, Py.dyalog should be in the same folder
+    path=os.path.dirname(SCRIPTFILE)+'/Py.dyalog'
     # Run the Dyalog instance in this thread
     p=Popen([dyalog, '-script'], stdin=PIPE)
-    p.communicate(input=script%port)
+    p.communicate(input=script%(path,port))
 
             
 def windows_find_dyalog():
