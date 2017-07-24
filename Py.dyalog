@@ -46,8 +46,8 @@
                     ⎕SIGNAL⊂('EN'999)('Message' 'Cannot find Python on the path.')
                 :EndTrap
             :endif
-
-            ⎕SH pypath,' ',program,' ',(⍕srvport),'>/dev/null &'
+            ⎕SH pypath,' ',program,' ',(⍕srvport),' >/dev/null &'
+            
         ∇
 
         ∇ Kill pid
@@ -534,8 +534,8 @@
                 :Else
                     Msgs.ERR USend ⍕⎕DMX.(EM Message)
                 :EndTrap
-                
-                
+
+
                 ⍝ 'EVAL' message
             :Case Msgs.EVAL
                 :Trap 0
