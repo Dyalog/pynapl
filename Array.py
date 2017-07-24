@@ -86,6 +86,9 @@ class APLArray(object):
 
         If the object is already an APLArray, it will be returned unchanged.
         """
+    
+        if obj is None:
+            return APLArray.from_python([]) #Return the empty list for "None"
 
         if isinstance(obj, APLArray):
             return obj # it already is of the right type

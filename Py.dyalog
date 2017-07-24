@@ -1,7 +1,19 @@
 ﻿:Namespace Py
     ⎕IO ⎕ML←1
 
+    :Section Helper functions to include Python code in APL code
+        
+        ⍝ thanks to Adám for these functions
+        ∇ r←ScriptFollows
+            r←2↓∊(⎕UCS 13 10)∘,¨Follows
+        ∇
 
+        ∇ r←Follows;n;x
+            n←⎕XSI{1++/∧\⍵∘≡¨(⊃⍴⍵)↑¨⍺}(⍕⎕THIS),'.'
+            r←↓(∨\~∧⌿' '=x)/[2]x←1↓[2]↑(↓∧⍀∨\'⍝'=↑x)/¨x←(1+n⊃⎕LC)↓↓(180⌶)n⊃⎕XSI
+        ∇ 
+
+    :EndSection
 
 
     ⍝ Retrieve the path from the namespace
@@ -594,7 +606,7 @@
             str←recv
         ∇
 
-        
+
         ⍝ expose a Python function as a monadic APL "function" (using a namespace)
         ⍝ the argument is *args. The optional left argument is a boolean vector
         ⍝ specifying for each argument whether or not it should be translated
@@ -603,12 +615,12 @@
         ⍝ public operators in classes.
         ∇ ret←PyFn pyfn
             :Access Public
-            
+
 
             ret←⎕NS''
             ret.py←⎕THIS
             ret.fname←pyfn
-            
+
             ⍝ call function with arguments as vector
             ⍝ the optional left argument is a boolean vector
             ⍝ describing for each argument whether it should be converted
@@ -616,12 +628,12 @@
                 ⍺←(≢,⍵)/1
                 (fname,'(',(1↓∊',',[1.5]'⍞⎕'[1+⍺]),')') py.Eval ,⍵   
             }
-            
+
             ⍝ call the function with APL left and right arguments
             ⍝ only works for monadic or dyadic functions
             ret.Call←{⍺←⊂ ⋄ CallVec ⍺ ⍵}
         ∇
-        
+
         ⍝ evaluate Python code w/arguments
         ∇ ret←expr Eval args;msg;mtype;recv;nargs
             :Access Public
