@@ -326,6 +326,12 @@ class Connection(object):
                 # this should be an UTF-8 string
                 aplexpr=unicode(aplexpr, "utf8")
 
+            # normalize (remove superfluous whitespace and newlines, add in ⋄s where
+            # necessary)
+
+            aplexpr = u'⋄'.join(x.strip() for x in aplexpr.split(u"\n") if x.strip()) \
+                          .replace(u'{⋄',u'{').replace(u'⋄}',u'}')
+
             payload = APLArray.from_python([aplexpr, args]).toJSONString()
             Message(Message.EVAL, payload).send(self.conn.sockfile)
 
