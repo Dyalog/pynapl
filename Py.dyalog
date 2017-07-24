@@ -594,12 +594,37 @@
             str←recv
         ∇
 
+        
+        ⍝ expose a Python function as a monadic APL "function" (using a namespace)
+        ⍝ the argument is *args. The optional left argument is a boolean vector
+        ⍝ specifying for each argument whether or not it should be translated
+        ⍝ (default: yes)
+        ⍝ I wanted to use operators for this at first, but apparently you can't have
+        ⍝ public operators in classes.
+        ∇ ret←PyFn pyfn
+            :Access Public
+            
+
+            ret←⎕NS''
+            ret.py←⎕THIS
+            ret.fname←pyfn
+            
+            ⍝ call function with arguments as vector
+            ⍝ the optional left argument is a boolean vector
+            ⍝ describing for each argument whether it should be converted
+            ret.CallVec←{
+                ⍺←(≢,⍵)/1
+                (fname,'(',(1↓∊',',[1.5]'⍞⎕'[1+⍺]),')') py.Eval ,⍵   
+            }
+            
+            ⍝ call the function with APL left and right arguments
+            ⍝ only works for monadic or dyadic functions
+            ret.Call←{⍺←⊂ ⋄ CallVec ⍺ ⍵}
+        ∇
+        
         ⍝ evaluate Python code w/arguments
         ∇ ret←expr Eval args;msg;mtype;recv;nargs
             :Access Public
-
-            ⍝ check if argument list length matches # of args in expr
-
 
             expr←,expr
             args←,args

@@ -7,7 +7,7 @@
 #   0     1  2  3  4         ......
 #   TYPE  SIZE (big-endian)  MESSAGE (`size` bytes, expected to be UTF-8 encoded)
 
-import socket, os, time
+import socket, os, time, types
 import RunDyalog
 from Array import *
 
@@ -188,6 +188,7 @@ class Connection(object):
         """Represents the APL interpreter."""
         def __init__(self, conn):
             self.conn=conn
+            self.ops=0 # keeps track of how many operators have been defined
 
         def stop(self):
             """If the connection was initiated from the Python side, this will close it."""
@@ -223,7 +224,75 @@ class Connection(object):
                 if len(args)==2: return self.eval("(⊃∆)(%s)2⊃∆"%aplfn, args[0], args[1], raw=raw)
                 return APLError("Function must be niladic, monadic or dyadic.")
 
+            # op can use this for an optimization
+            __fn.aplfn = aplfn
+
             return __fn
+
+        def op(self, aplop):
+            """Expose an APL operator.
+
+            It can be called with either 1 or 2 arguments, depending on whether the
+            operator is monadic or dyadic. The arguments may be values or Python
+            functions.
+
+            If the Python function was created using apl.fn, this is recognized
+            and the function is run in APL directly.
+            """
+
+            def storeArgInWs(arg,nm):
+                wsname = "___op%d_%s" % (self.ops, nm)
+
+                if type(arg) is types.FunctionType:
+                    # it is a function
+                    if 'aplfn' in arg.__dict__:
+                        # it is an APL function
+                        self.eval("%s ← %s⋄⍬" % (wsname, arg.aplfn))
+                    else:
+                        # it is a Python function
+                        # store it under this name
+                        self.__dict__[wsname] = arg
+                        # make it available to APL
+                        self.eval("%s ← (py.PyFn'APL.%s').Call⋄⍬" % (wsname, wsname))
+                else:
+                    # it is a value
+                    self.eval("%s ← ⊃∆⋄⍬" % wsname, arg) 
+                return wsname
+
+            def __op(aa, ww=None, raw=False):
+               
+
+                # store the arguments into APL at the time that the operator is defined
+                wsaa = storeArgInWs(aa, "aa")
+               
+                aplfn = "((%s)(%s))" % (wsaa, aplop)
+
+                # . / ∘. must be special-cased
+                if aplop in [".","∘."]: aplfn='(∘.(%s))' % wsaa
+
+                if not ww is None: 
+                    wsww = storeArgInWs(ww, "ww")
+                    aplfn = "((%s)(%s)(%s))" % (wsaa, aplop, wsww)
+                    # again, . / ∘. must be special-cased
+                    if aplop in [".","∘."]: aplfn='((%s).(%s))' % (wsaa, wsww)
+                
+                def __fn(*args):
+                    # an APL operator can't return a niladic function
+                    if len(args)==0: raise APLError("A function derived from an APL operator cannot be niladic.")
+                    if len(args)==1: return self.eval("(%s)⊃∆"%aplfn, args[0], raw=raw)
+                    if len(args)==2: return self.eval("(⊃∆)(%s)2⊃∆"%aplfn, args[0], args[1], raw=raw)
+                    raise APLError("Function must be monadic or dyadic.")
+
+                __fn.aplfn = aplfn
+                self.ops+=1
+                return __fn
+            
+
+            return __op
+
+
+
+
 
         def repr(self, aplcode):
             """Run an APL expression, return string representation"""
