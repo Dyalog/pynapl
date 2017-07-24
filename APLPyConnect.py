@@ -268,7 +268,7 @@ class Connection(object):
                 aplfn = "((%s)(%s))" % (wsaa, aplop)
 
                 # . / ∘. must be special-cased
-                if aplop in [".","∘."]: aplfn='(∘.(%s))' % wsaa
+                if aplop in [".","∘.",u"∘."]: aplfn='(∘.(%s))' % wsaa
 
                 if not ww is None: 
                     wsww = storeArgInWs(ww, "ww")
