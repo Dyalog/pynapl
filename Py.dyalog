@@ -2,8 +2,8 @@
     ⎕IO ⎕ML←1
 
     :Section Helper functions to include Python code in APL code
-        
-        ⍝ thanks to Adám for these functions
+
+        ⍝ thanks to Adám for these functions 
         ∇ r←ScriptFollows
             r←2↓∊(⎕UCS 13 10)∘,¨Follows
         ∇
@@ -19,15 +19,15 @@
     ⍝ Retrieve the path from the namespace
     ∇r←ScriptPath
         ⍝r←SALT_Data.SourceFile
-        
+
         ⍝ Adám's SourceFile function
         r←{ ⍝ Get pathname to sourcefile for item ⍵
-     c←⎕NC⊂,⍕⍵
-     c=2.1:(SALT_Var_Data.VD[;1]⍳⊂⍵(⊢,~)'#.')⊃SALT_Var_Data.VD[;2],⊂''
-     c∊3.1 3.2 4.1 4.2:1↓⊃('§'∘=⊂⊢)∊¯2↑⎕NR ⍵
-     (r←326=⎕DR ⍵)∨c∊9+0.1×⍳8:{6::'' ⋄ ''≡f←⊃(4∘⊃¨(/⍨)(⍵≡⊃)¨)5177⌶⍬:⍵.SALT_Data.SourceFile ⋄ f}⍎⍣(~r)⊢⍵
-     ''
- }⎕THIS
+            c←⎕NC⊂,⍕⍵
+            c=2.1:(SALT_Var_Data.VD[;1]⍳⊂⍵(⊢,~)'#.')⊃SALT_Var_Data.VD[;2],⊂''
+            c∊3.1 3.2 4.1 4.2:1↓⊃('§'∘=⊂⊢)∊¯2↑⎕NR ⍵
+            (r←326=⎕DR ⍵)∨c∊9+0.1×⍳8:{6::'' ⋄ ''≡f←⊃(4∘⊃¨(/⍨)(⍵≡⊃)¨)5177⌶⍬:⍵.SALT_Data.SourceFile ⋄ f}⍎⍣(~r)⊢⍵
+            ''
+        }⎕THIS
     ∇
 
     ⍝ Start an APL slave and connect to the server at the given port
@@ -244,7 +244,7 @@
                             dat←n.d
 
                             ⍝empty array: type is 1 if char prototype
-                            0=≢dat: ' '=⊃0↑dat
+                            0=≢dat:{15::0 ⋄ ' '=⊃0↑⍵}dat
 
                             ⍝nested array: type is that of nested array
                             dat←⊃dat
