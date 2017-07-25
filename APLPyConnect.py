@@ -218,10 +218,13 @@ class Connection(object):
             than be converted to a 'suitable' Python representation.
             """
 
+            if not type(aplfn) is unicode:
+                aplfn = unicode(aplfn, "utf-8")
+
             def __fn(*args):
                 if len(args)==0: return self.eval(aplfn, raw=raw)
-                if len(args)==1: return self.eval("(%s)⊃∆"%aplfn, args[0], raw=raw)
-                if len(args)==2: return self.eval("(⊃∆)(%s)2⊃∆"%aplfn, args[0], args[1], raw=raw)
+                if len(args)==1: return self.eval(u"(%s)⊃∆"%aplfn, args[0], raw=raw)
+                if len(args)==2: return self.eval(u"(⊃∆)(%s)2⊃∆"%aplfn, args[0], args[1], raw=raw)
                 return APLError("Function must be niladic, monadic or dyadic.")
 
             # op can use this for an optimization
@@ -240,23 +243,26 @@ class Connection(object):
             and the function is run in APL directly.
             """
 
+            if not type(aplop) is unicode:
+                aplop = unicode(aplop, "utf-8")
+
             def storeArgInWs(arg,nm):
-                wsname = "___op%d_%s" % (self.ops, nm)
+                wsname = u"___op%d_%s" % (self.ops, nm)
 
                 if type(arg) is types.FunctionType:
                     # it is a function
                     if 'aplfn' in arg.__dict__:
                         # it is an APL function
-                        self.eval("%s ← %s⋄⍬" % (wsname, arg.aplfn))
+                        self.eval(u"%s ← %s⋄⍬" % (wsname, arg.aplfn))
                     else:
                         # it is a Python function
                         # store it under this name
                         self.__dict__[wsname] = arg
                         # make it available to APL
-                        self.eval("%s ← (py.PyFn'APL.%s').Call⋄⍬" % (wsname, wsname))
+                        self.eval(u"%s ← (py.PyFn'APL.%s').Call⋄⍬" % (wsname, wsname))
                 else:
                     # it is a value
-                    self.eval("%s ← ⊃∆⋄⍬" % wsname, arg) 
+                    self.eval(u"%s ← ⊃∆⋄⍬" % wsname, arg) 
                 return wsname
 
             def __op(aa, ww=None, raw=False):
@@ -265,22 +271,22 @@ class Connection(object):
                 # store the arguments into APL at the time that the operator is defined
                 wsaa = storeArgInWs(aa, "aa")
                
-                aplfn = "((%s)(%s))" % (wsaa, aplop)
+                aplfn = u"((%s)(%s))" % (wsaa, aplop)
 
                 # . / ∘. must be special-cased
-                if aplop in [".","∘.",u"∘."]: aplfn='(∘.(%s))' % wsaa
+                if aplop in [u".",u"∘."]: aplfn=u'(∘.(%s))' % wsaa
 
                 if not ww is None: 
                     wsww = storeArgInWs(ww, "ww")
-                    aplfn = "((%s)(%s)(%s))" % (wsaa, aplop, wsww)
+                    aplfn = u"((%s)%s(%s))" % (wsaa, aplop, wsww)
                     # again, . / ∘. must be special-cased
-                    if aplop in [".","∘."]: aplfn='((%s).(%s))' % (wsaa, wsww)
+                    if aplop in [u".",u"∘."]: aplfn=u'((%s).(%s))' % (wsaa, wsww)
                 
                 def __fn(*args):
                     # an APL operator can't return a niladic function
                     if len(args)==0: raise APLError("A function derived from an APL operator cannot be niladic.")
-                    if len(args)==1: return self.eval("(%s)⊃∆"%aplfn, args[0], raw=raw)
-                    if len(args)==2: return self.eval("(⊃∆)(%s)2⊃∆"%aplfn, args[0], args[1], raw=raw)
+                    if len(args)==1: return self.eval(u"(%s)⊃∆"%aplfn, args[0], raw=raw)
+                    if len(args)==2: return self.eval(u"(⊃∆)(%s)2⊃∆"%aplfn, args[0], args[1], raw=raw)
                     raise APLError("Function must be monadic or dyadic.")
 
                 __fn.aplfn = aplfn
