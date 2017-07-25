@@ -337,7 +337,10 @@ class Connection(object):
             # necessary)
 
             aplexpr = u'⋄'.join(x.strip() for x in aplexpr.split(u"\n") if x.strip()) \
-                          .replace(u'{⋄',u'{').replace(u'⋄}',u'}')
+                          .replace(u'{⋄',u'{').replace(u'⋄}',u'}') \
+                          .replace(u'(⋄',u'(').replace(u'⋄)',u')')
+
+            # print "evaluating: ", aplexpr
 
             payload = APLArray.from_python([aplexpr, args]).toJSONString()
             Message(Message.EVAL, payload).send(self.conn.sockfile)
@@ -355,7 +358,7 @@ class Connection(object):
                 return answer.to_python()
 
     @staticmethod
-    def APLClient(DEBUG=False):
+    def APLClient(DEBUG=False, dyalog=None):
         """Start an APL client. This function returns an APL instance."""
         
         # start a server
@@ -367,7 +370,7 @@ class Connection(object):
         if DEBUG:print "Waiting for connection at %d" % port
         srvsock.listen(1)
         
-        if not DEBUG: RunDyalog.dystart(port)
+        if not DEBUG: RunDyalog.dystart(port, dyalog=dyalog)
 
         conn, _ = srvsock.accept()
 
