@@ -249,9 +249,10 @@ class Connection(object):
             def storeArgInWs(arg,nm):
                 wsname = u"___op%d_%s" % (self.ops, nm)
 
-                if type(arg) is types.FunctionType:
+                if type(arg) is types.FunctionType \
+                or type(arg) is types.BuiltinFunctionType:
                     # it is a function
-                    if 'aplfn' in arg.__dict__:
+                    if hasattr(arg,'__dict__') and 'aplfn' in arg.__dict__:
                         # it is an APL function
                         self.eval(u"%s ← %s⋄⍬" % (wsname, arg.aplfn))
                     else:
