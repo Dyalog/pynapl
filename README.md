@@ -174,7 +174,7 @@ This is a relatively low-level function, and it is probably better
 to use `fn` and `op`. 
 
 Conversion of data *to* APL types is done automatically. (Anything
-that`s not an `APLArray` is converted.) The result of the evaluation
+that's not an `APLArray` is converted.) The result of the evaluation
 is converted back to the Python format unless `raw` is set.
 
 ```
