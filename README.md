@@ -251,7 +251,7 @@ exposed as Python functions using the `op` function.
 ```
 
 The operator is then exposed as a Python function, which takes 
-one or two arguments, depending on whehter the operator is 
+one or two arguments, depending on whether the operator is 
 monadic or dyadic.
 
 The arguments may be either values or Python functions.
@@ -269,9 +269,9 @@ you must first import the APL function using `fn`.
 [1, 3, 6]
 ```
 
-In the case of `apl_sumscan`, it is detected that the function
-is from APL, and the calls to Python that would otherwise be made
-are optimized away.
+If an APL operator is applied to an APL function via Python,
+as in the `apl_sumscan` example, this is detected, and the application
+is done in APL without calling back into Python. 
 
 ### Data conversion
 
