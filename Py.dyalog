@@ -121,7 +121,7 @@
             :If 0=⎕NC'taboo' ⋄ taboo←⍬ ⋄ :EndIf
 
             :If ~(⎕NC⊂'obj')∊2.1 2.2 9.1
-                ⎕SIGNAL⊂('EN' 6)('Message' 'Only variables and namespaces can be serialized.')
+                ⎕SIGNAL⊂('EN' 6)('Message' 'Only values and namespaces containing values can be serialized.')
             :EndIf
 
             :If 0=≡obj
