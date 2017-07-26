@@ -140,10 +140,14 @@ An APL object can be obtained using the `APL.APL` function. This
 will start a Dyalog instance in the background and connect to it.
 
 ```python
-import APL
+from aplpy import APL
 apl = APL.APL()
 ```
 
+An optional `dyalog` argument may be given to the `APL` function,
+to specify the path to the `dyalog` interpreter. If it is not given,
+on Unix the `dyalog` interpreter on the path will be used,
+on Windows the registry will be consulted. 
 The Dyalog instance will be shut down once the `apl` object is
 destroyed.
 
@@ -208,9 +212,9 @@ automatic data conversion.
 
 The function may be an anonymous dfn and may contain newlines.
 It may *not* be a definition of a tradfn (those can be defined
-using `fix`, then referred to by name using `fn`).
+using `fix` or `tradfn`, then referred to by name using `fn`).
 
-```
+```python
 >>> factorial = apl.fn("""
 { ⍵≤0:1
   ⍵×∇⍵-1
@@ -220,6 +224,21 @@ using `fix`, then referred to by name using `fn`).
 120
 ```
 
+##### Defining a tradfn using Python
+
+Apart from using `fix`, a tradfn can also be defined using the
+`tradfn` function:
+
+```python
+>>> foo = apl.tradfn("""
+r←foo x
+r←x+x
+""")
+>>> foo(5)
+10
+>>> apl.fn("foo")(5)
+10
+```
 
 #### Making APL operators available to Python
 
