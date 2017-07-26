@@ -1,0 +1,4 @@
+include aplpy/Py.dyalog
+include aplpy/PyTest.dyalog
+include aplpy/WinPySlave.dyalog
+include aplpy/WinPySlave.dyapp

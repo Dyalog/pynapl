@@ -2,3 +2,6 @@ aplcore
 *.pyc
 .*.sw*
 WinPort.dyalog
+APLPy.egg-info
+build
+dist
