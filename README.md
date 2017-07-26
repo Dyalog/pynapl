@@ -289,7 +289,7 @@ is done in APL without calling back into Python.
  * Numbers: int, long, or float, depending on which fits best
  * Simple (non-nested) character vector: Unicode string
  * Numeric vector / nested vector: List
- * Higher-rank array: nested vector (the equivalent of
+ * Higher-rank array: nested list (the equivalent of
    `{↓⍣((⊃⍴⍴⍵)-1)⊢⍵}` is done).
  * Namespace containing values: dictionary
 
