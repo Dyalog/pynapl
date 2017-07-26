@@ -633,10 +633,16 @@
             :Case Msgs.EXEC
 
                 ⍝ split the message by newlines
-                pyaplns.∆∆∆∆∆←(mdata=⎕ucs 10 13)⊆mdata
+                pyaplns.∆∆∆∆∆←(~mdata∊⎕ucs 10 13)⊆mdata
+
+                
                 :Trap 0
-                    pyaplns⍎'2⎕FIX ∆∆∆∆∆'
-                    Msgs.OK USend ''
+                    rslt←pyaplns⍎'⎕FX ∆∆∆∆∆'
+                    :If ''≡0↑rslt
+                        Msgs.OK USend rslt
+                    :Else
+                        Msgs.ERR USend 'Error on line ',⍕rslt
+                    :EndIf
                 :Else
                     Msgs.ERR USend ⍕⎕DMX.(EM Message)
                 :EndTrap

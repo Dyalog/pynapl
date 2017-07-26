@@ -299,7 +299,18 @@ class Connection(object):
 
 
 
+        def tradfn(self, tradfn):
+            """Define a tradfn or tradop on the APL side.
 
+            Input must be string, the lines of which will be passed to ⎕FX."""
+
+            Message(Message.EXEC, tradfn).send(self.conn.sockfile)
+            reply = self.conn.expect(Message.OK)
+
+            if reply.type == Message.ERR:
+                raise APLError(reply.data)
+            else:
+                return self.fn(reply.data)
 
         def repr(self, aplcode):
             """Run an APL expression, return string representation"""
