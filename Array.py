@@ -9,6 +9,47 @@ import collections
 from Util import *
 
 # assuming ⎕IO=0 for now
+class APLNamespace(object):
+    def __init__(self, dct=None):
+        if dct is None: self.dct={}
+        else: self.dct=dct
+
+    def __getitem__(self, x):
+        return self.dct[x]
+
+    def __setitem__(self, x, val):
+        self.dct[x] = APLArray.from_python(val, enclose=False)
+
+    def toJSONString(self):
+        return json.dumps(self, cls=ArrayEncoder, ensure_ascii=False)
+
+    # convert an APL namespace to a Python dictionary
+    def to_python(self):
+        newdct = {}
+        for x in self.dct:
+            obj = self.dct[x]
+            if isinstance(obj, APLArray) \
+            or isinstance(obj, APLNamespace):
+                newdct[x] = obj.to_python()
+            else:
+                newdct[x] = obj
+        return newdct
+
+    @staticmethod
+    # convert a Python dictionary to an APL namespace
+    def from_python(dct):
+        newdct = {}
+        for x in dct: 
+            newdct[x] = APLArray.from_python(dct[x])
+        return APLNamespace(newdct)
+
+
+    @staticmethod 
+    def fromJSONString(string):
+        return APLArray._json_decoder.decode(string)
+
+
+
 class APLArray(object):
     """Serializable multidimensional array.
       
@@ -26,18 +67,23 @@ class APLArray(object):
     def __json_object_hook(jsobj):
         # if this is an APL array, return it as such
         
-        if type(jsobj) is dict \
-        and 'r' in jsobj \
-        and 'd' in jsobj:
-            type_hint = APLArray.TYPE_HINT_NUM
-            if 't' in jsobj: type_hint = jsobj['t']
-            return APLArray(jsobj['r'], list(jsobj['d']), type_hint=type_hint)
-
+        if type(jsobj) is dict:
+            if 'r' in jsobj and 'd' in jsobj:
+                # this is an APL array
+                type_hint = APLArray.TYPE_HINT_NUM
+                if 't' in jsobj: type_hint = jsobj['t']
+                return APLArray(jsobj['r'], list(jsobj['d']), type_hint=type_hint)
+            elif 'ns' in jsobj:
+                # this is an APL namespace, which can be represented as a dict in Python
+                return APLNamespace(jsobj['ns'])
+            else:
+                return jsobj
         else:
             return jsobj
     
     # define a reusable json decoder
-    __json_decoder = json.JSONDecoder(encoding="utf8", object_hook=__json_object_hook)
+    _json_decoder = json.JSONDecoder(encoding="utf8", object_hook=__json_object_hook)
+
 
     # convert array to suitable-ish python representation
     def to_python(self):
@@ -49,12 +95,13 @@ class APLArray(object):
         if len(self.rho)==0: # scalar
             scalar = self.data[0]
             if isinstance(scalar, APLArray): return scalar.to_python()
+            elif isinstance(scalar, APLNamespace): return scalar.to_python()
             else: return scalar
 
         elif len(self.rho)==1: # array
             # if the type hint says characters, and the array is simple, return a string
             if self.genTypeHint() == APLArray.TYPE_HINT_CHAR \
-            and not any(isinstance(x, APLArray) for x in self.data):
+            and not any(isinstance(x, APLArray) or isinstance(x, APLNamespace) for x in self.data):
                 return ''.join(self.data)
 
             # if not, return a list. If this is a nested array that _does_ have a simple
@@ -63,7 +110,9 @@ class APLArray(object):
             else:
                 pylist = []
                 for item in self.data:
-                    if isinstance(item,APLArray): item=item.to_python()
+                    if isinstance(item,APLArray) or isinstance(item,APLNamespace): 
+                        item=item.to_python()
+                    
                     pylist.append(item)
                 return pylist
 
@@ -90,8 +139,13 @@ class APLArray(object):
         if obj is None:
             return APLArray.from_python([]) #Return the empty list for "None"
 
-        if isinstance(obj, APLArray):
+        if isinstance(obj, APLArray) \
+        or isinstance(obj, APLNamespace):
             return obj # it already is of the right type
+
+        if type(obj) is dict:
+            # convert all items in the dictionary to APL representation
+            return APLNamespace.from_python(obj)
 
         # lists, tuples and strings can be represented as vectors
         if type(obj) in (list,tuple):
@@ -221,13 +275,15 @@ class APLArray(object):
 
     @staticmethod 
     def fromJSONString(string):
-        return APLArray.__json_decoder.decode(string)
+        return APLArray._json_decoder.decode(string)
 
 # serialize an array using JSON
 class ArrayEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, APLArray):
             return {"r": obj.rho, "d": obj.data, "t":obj.genTypeHint()}
+        elif isinstance(obj, APLNamespace):
+            return {"ns": obj.dct}
         else:
-            return json.JSONEncoder.default(obj)
+            return json.JSONEncoder.default(self, obj)
 

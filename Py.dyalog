@@ -35,6 +35,147 @@
         py←⎕NEW Py ('Client' port)
     ∇
 
+    :Class JSONSerializer
+
+        ⍝ deserialize
+        ∇ r←deserialize json
+            :Access Public Shared
+            r←decode ⎕JSON json
+        ∇
+
+        ∇ r←decode obj
+            :Access Public Shared
+
+            :If 9.1≠⎕NC⊂'obj'
+                ⍝ automatically decoded by ⎕JSON
+                r←obj
+                :Return
+            :EndIf
+
+            :If 0≠⎕NC'obj.ns'
+                ⍝ an encoded namespace
+                r←decodeNS obj.ns
+                :Return
+            :EndIf
+
+            ⍝ if not a simple object or a namespace,
+            ⍝ it must then be an array
+
+            :If (0=≢obj.d)∧0≠⎕NC'obj.t'
+                ⍝ empty array with type hint
+                :If 0=obj.t
+                    r←obj.r⍴⍬
+                :ElseIf 1=obj.t
+                    r←obj.r⍴''
+                :Else
+                    ⎕SIGNAL⊂('EN' 11)('Message' 'Invalid type hint')
+                :EndIf
+            :Else
+                ⍝ otherwise, reconstruct the array as given
+                r←obj.r⍴decode¨⊃¨obj.d
+            :EndIf
+        ∇
+
+        ∇ r←decodeNS ns;child;children;dec
+            r←⎕NS''
+
+            children←ns.⎕NL-2 9
+
+            :For child :In children
+                dec←decode ns.⍎child
+                child r.{⍎⍺,'←⍵'}dec
+            :EndFor
+        ∇
+
+        ⍝ serialize
+        ∇ r←serialize obj;enc;ns
+            :Access Public Shared
+            enc←encode obj
+            :If 0=⎕NC'enc.r'
+                ns←⎕NS''
+                ns.r←⍬
+                ns.d←,enc
+                addTypeHint ns
+                enc←ns
+            :EndIf
+            r←⎕JSON enc
+        ∇
+
+        ⍝ add a type hint to an encoded array
+        ∇ addTypeHint obj
+            :Trap 16
+                ⍝ if the prototype is a namespace, this raises
+                ⍝ NONCE ERROR, thus this hacky trap
+                obj.t←' '=⊃0⍴∊obj.d
+            :Else
+                ⍝ we don't really do prototypes, so let's
+                ⍝ just say the type is numeric
+                obj.t←0
+            :EndTrap
+        ∇
+
+        ⍝ create something JSONizable from an APL object
+        ∇ r←{taboo}encode obj;arrns
+            :Access Public Shared
+
+            :If 0=⎕NC'taboo' ⋄ taboo←⍬ ⋄ :EndIf
+
+            :If ~(⎕NC⊂'obj')∊2.1 2.2 9.1
+                ⎕SIGNAL⊂('EN' 6)('Message' 'Only variables and namespaces can be serialized.')
+            :EndIf
+
+            :If 0=≡obj
+                ⍝ The object is simple, return it
+
+                ⍝ if it is a namespace, it needs to be encapsulated
+                r←taboo encapsulate⍣(9=⊃⎕NC'obj')⊢obj
+            :Else
+
+                ⍝ the object is some kind of array,
+                ⍝ we need to encode each element
+                r←⎕NS''
+                r.r←⍴obj
+                r.d←,(⊂taboo)encode¨obj
+                addTypeHint r
+            :EndIf
+
+        ∇
+
+        ⍝ encapsulate namespace
+        ∇ r←{taboo}encapsulate obj;ns;children;child;enc
+            :Access Public Shared
+
+            :If 0=⎕NC'taboo' ⋄ taboo←⍬ ⋄ :EndIf
+
+            :If obj∊taboo ⋄ r←⍬ ⋄ :EndIf
+
+            :If 9≠⎕NC'obj'
+                ⍝ not a namespace, return it unchanged
+                r←obj
+                :Return
+            :EndIf
+
+            ns←⎕NS''
+
+            ⍝ find child variables and namespaces
+            children←obj.⎕NL-2 9
+
+            ⍝ loop through the children, encoding each and
+            ⍝ storing it under the same name in the namespace
+            :For child :In children
+                enc←(taboo,obj)encode obj.⍎child
+                child ns.{⍎⍺,'←⍵'}enc
+            :EndFor
+
+            ⍝ encapsulate it in a namespace with a single field
+            ⍝ 'ns', so we can tell it apart from the other
+            ⍝ namespaces
+            r←⎕NS''
+            r.ns←ns
+        ∇
+
+    :EndClass
+
     :Class UnixInterface
         ⍝ Functions to interface with Unix OSes
 
@@ -227,66 +368,10 @@
             }
 
             ⍝ Serialize a (possibly nested) array
-            serialize←{
-                ~serializable ⍵: 'Array must contain only simple values' ⎕SIGNAL 11
-                ⎕JSON {
-                    ⍺←0
-
-                    wrap←{
-                        n←⎕NS''
-                        n.r←⍴⍵
-                        n.d←,⍺⍺¨⍵
-
-                        ⍝ type_hint: 1 if characters, 0 if numbers
-                        ⍝ (python cannot otherwise tell the difference
-                        ⍝ if the list is empty)
-                        n.t←{
-                            dat←n.d
-
-                            ⍝empty array: type is 1 if char prototype
-                            0=≢dat:{15::0 ⋄ ' '=⊃0↑⍵}dat
-
-                            ⍝nested array: type is that of nested array
-                            dat←⊃dat
-                            9=⎕NC'dat':dat.t
-
-                            ⍝array w/simple value: type of simple value
-                            2=⎕NC'dat':' '=⊃0↑dat
-
-                            ('? ⎕NC=',⍕⎕NC'dat' ) ⎕SIGNAL 16
-                        }⍬
-
-                        n
-                    }
-
-                    0=≡⍵: ⊢wrap⍣(~⍺)⊢⍵
-                    1=≡⍵: ⊢wrap ⍵
-                    (1∘∇)wrap ⍵
-                }⍵
-            }
+            serialize←{#.Py.JSONSerializer.serialize ⍵}
 
             ⍝ Deserialize a (possibly nested) array
-            deserialize←{
-                {
-                    w←⍵
-                    ⍝ if not a JSON object, leave it alone
-                    0∨.≥⎕NC'w.d' 'w.r':⍵
-
-                    ⍝ if array is empty and type_hint is
-                    ⍝ available, use it to construct an empty array
-                    ⍝ of the right type
-                    (0=≢w.d)∧0≠⎕NC'w.t':{
-                        ⍝ 0 = numbers
-                        0=⍵.t: ⍵.r⍴⍬
-                        1=⍵.t: ⍵.r⍴''
-
-                        ('Invalid type hint: ',⍕⍵.t)⎕SIGNAL 11 
-                    }w
-
-                    ⍝ reconstruct the array as given
-                    w.r⍴∇¨⊃¨w.d
-                } ⎕JSON ⍵
-            }
+            deserialize←{#.Py.JSONSerializer.deserialize ⍵}
 
             :Section JSON serialization debug code
                 ⍝ Send an array through the serialization code on both sides

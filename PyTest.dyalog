@@ -1,10 +1,10 @@
 ﻿:Namespace PyTest
 
     num←0
-    ∇ r←Click;update
+    ∇ r←ClickHello;update
         num+←1
         ⎕←'Hello! ',num
-        
+
         ⍝ 'py' is available here because this function is called from Python
         ⍝ this calls the "updateLabel" function defined below in Python
         update←(py.PyFn 'updateLabel').Call
@@ -26,7 +26,7 @@
         ⍝  window.title="GUI Test"
         ⍝  window.geometry("300x300")
         ⍝  btn=Tkinter.Button(window, text="Hello APL",
-        ⍝           command=APL.fn("#.PyTest.Click"))
+        ⍝           command=APL.fn("#.PyTest.ClickHello"))
         ⍝  btn.pack()
         ⍝  lbl=Tkinter.Label(window, text="---")
         ⍝  lbl.pack()
@@ -36,7 +36,7 @@
         ⍝ def updateLabel(newNum):
         ⍝  global lbl
         ⍝  lbl.config(text=str(newNum))
-        
+
         'start()'py.Eval ⍬
     ∇
 
