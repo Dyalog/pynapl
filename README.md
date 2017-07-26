@@ -263,7 +263,7 @@ are optimized away.
  * Other string: character vector
  * List or tuple: vector
  * NoneType: empty numeric vector
- * *TODO* - dictionary: namespace
+ * Dictionary: namespace
 
 #### From APL to Python
 
@@ -272,7 +272,7 @@ are optimized away.
  * Numeric vector / nested vector: List
  * Higher-rank array: nested vector (the equivalent of
    `{↓⍣((⊃⍴⍴⍵)-1)⊢⍵}` is done).
- * *TODO* - namespace: dictionary
+ * Namespace containing values: dictionary
 
 #### The `APLArray` class
 
