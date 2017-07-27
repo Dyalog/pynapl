@@ -18,7 +18,7 @@ def posix_dythread(port, dyalog="dyalog"):
     # find the path, Py.dyalog should be in the same folder
     path=os.path.dirname(SCRIPTFILE)+'/Py.dyalog'
     # Run the Dyalog instance in this thread
-    p=Popen([dyalog, '-script'], stdin=PIPE)
+    p=Popen([dyalog, '-script'], stdin=PIPE, preexec_fn=os.setpgrp)
     p.communicate(input=script%(path,port))
 
 def cyg_convert_path(path, type):

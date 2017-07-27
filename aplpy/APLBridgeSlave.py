@@ -5,12 +5,16 @@
 
 import socket
 import sys
+import os
+import signal
 import APLPyConnect as C
 
 if __name__=="__main__":
     port = int(sys.argv[1])
 
-	
+    os.setpgrp()
+    signal.signal(signal.SIGINT, signal.default_int_handler)
+
     print "Connecting to APL at port %d" % port
     
 	# Attempt an IPV6 socket first 

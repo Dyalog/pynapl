@@ -216,6 +216,13 @@
             :Access Public Shared
             ⎕SH 'kill ', ⍕pid
         ∇
+
+
+        ∇ Interrupt pid
+            :Access Public Shared
+            ⎕SH 'kill -2 ',⍕pid
+        ∇
+
     :EndClass     
 
 
@@ -307,6 +314,7 @@
             :Return
 
         ∇
+
         ∇ Kill ignored
             ⍝ the rest of the program will pass a PID in for both OSes,
             ⍝ in Windows we don't need it, so we ignore it.
@@ -318,7 +326,10 @@
             :EndTrap
         ∇           
 
-
+        ∇ Interrupt ignored
+            :Access Public Instance
+            'Not implemented' ⎕SIGNAL 16
+        ∇
 
     :EndClass
 
@@ -529,10 +540,17 @@
                     :If type∊msgtype Msgs.ERR
                         :Leave
                     :Else
-                        ⍝ this is some other message that needs to be handled
-                        type HandleMsg data
-                        ⍝ afterwards we need to start listening for our message
-                        ⍝ again
+                        ⍝ this is some other message that needs to be handled first
+                        :Trap 1000
+                            ⍝ if we are interrupted during HandleMsg, that means
+                            ⍝ the APL side has been interrupted, and we need to tell
+                            ⍝ Python this
+
+
+                            type HandleMsg data
+                        :Else
+                            Msgs.ERR USend 'Interrupt'
+                        :EndTrap
                     :EndIf
                 :EndRepeat
             ∇
@@ -543,11 +561,14 @@
                 (success mtype recv)←s m ('UTF-8' (⎕UCS⍣s) r)
             ∇
 
-            ⍝ Receive message.
+            ⍝ Receive message. Will also signal Python on interrupt, if the Python is ours
             ⍝ Message fmt: X L L L L Data
-            ∇ (success mtype recv)←Recv;done;wait_ret;rc;obj;event;sdata;tmp
+            ∇ (success mtype recv)←Recv;done;wait_ret;rc;obj;event;sdata;tmp;interrupt;itr_ret
                 'Inactive instance' ⎕SIGNAL BROKEN when ~ready
-
+                
+                interrupt←0
+                
+                :Trap 1000
 
                 :Repeat
                     :If (~reading) ∧ 5≤≢curdata
@@ -563,12 +584,26 @@
                         curdata ↓⍨← curlen
                         ⍝ therefore, we are no longer reading a message
                         reading←0
+                        
+                        ⍝ if the interupt was not handled yet, do it now
+                        ⍝ since it arose while waiting for data, we need to signal Python
+                        :If interrupt
+                            itr_ret←0 ⍝ we can jump out afterwards
+                            →handle_interrupt
+                        :EndIf
+                        
                         :Return
                     :Else
                         ⍝ we don't currently have enough data for what we need
                         ⍝ (either a message or a header), so we need to read more
 
                         :Repeat
+                            :If interrupt
+                                itr_ret←interrupt_handled
+                                →handle_interrupt
+                            :EndIf
+                            interrupt_handled:
+                            
                             rc←⊃wait_ret←#.DRC.Wait connSocket
 
                             :If rc=0 ⍝ success
@@ -593,12 +628,45 @@
 
 
                 :EndRepeat
+                    
+                :Else
+                    ⍝ there was an interrupt
+                    ⍝ this is the worst thing I've done in a long time
+                    ⍝ this idea was suggested to me
+                    ⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝
+                    
+                    ⍝ There has been an interrupt at this point, but given the stateful
+                    ⍝ nature of this function, we can't just stop. We need to store it 
+                    ⍝ and handle it later. Since Dyalog APL doesn't seem to have a
+                    ⍝ 'no interrupts in here' block, we need to set a flag and then go back
+                    ⍝ where we came from. 
+                    
+                    interrupt←1
+                    
+                    ⍝ but how to go back to where we came from?
+                    ⍝ well...
+                    →{
+                        ⍝ 2⊃⎕DM contains: Recv[lineno] INTERRUPT .....
+                        ⍝ we need to jump to 'lineno'
+                        ⍎1↓(+\+⌿1 ¯1×[1]'[]'∘.=r)/r←(∧\' '≠⍵)/⍵
+                        ⍝ TODO: find some nice code injection vulnerability here
+                    }2⊃⎕DM
+                :EndTrap
 
                 :Return
 
                 error:
                 (success mtype recv)←0 ¯1 sdata
                 ready←0
+                :Return
+                
+                handle_interrupt:
+                interrupt←0
+                :If ⍬≢serverSocket
+                    ⍝ we are the server, thus the python is ours and needs to be signaled
+                    os.Interrupt pid
+                :EndIf
+                →itr_ret
 
             ∇
         :EndSection
@@ -609,84 +677,90 @@
 
         ⍝ Handle an incoming message
         ∇ mtype HandleMsg mdata;in;expr;args;ns;rslt;lines
-            :Select mtype
+            :Trap 1000
 
-                ⍝ 'OK' message
-                ⍝ There is no real reason for this to come in, but let's
-                ⍝ acknowledge it.
-            :Case Msgs.OK
-                Msgs.OK USend mdata
+                :Select mtype
 
-                ⍝ 'STOP' message
-            :Case Msgs.STOP
-                Stop
+                    ⍝ 'OK' message
+                    ⍝ There is no real reason for this to come in, but let's
+                    ⍝ acknowledge it.
+                :Case Msgs.OK
+                    Msgs.OK USend mdata
 
-                ⍝ 'REPR' message
-            :Case Msgs.REPR
-                :Trap 0
-                    Msgs.REPRRET USend ⍕pyaplns⍎mdata
-                :Else
-                    Msgs.ERR USend ⍕⎕DMX.(EM Message)
-                :EndTrap
+                    ⍝ 'STOP' message
+                :Case Msgs.STOP
+                    Stop
 
-                ⍝ 'EXEC' message
-            :Case Msgs.EXEC
-
-                ⍝ split the message by newlines
-                pyaplns.∆∆∆∆∆←(~mdata∊⎕ucs 10 13)⊆mdata
-
-                
-                :Trap 0
-                    rslt←pyaplns⍎'⎕FX ∆∆∆∆∆'
-                    :If ''≡0↑rslt
-                        Msgs.OK USend rslt
+                    ⍝ 'REPR' message
+                :Case Msgs.REPR
+                    :Trap 0
+                        Msgs.REPRRET USend ⍕pyaplns⍎mdata
                     :Else
-                        Msgs.ERR USend 'Error on line ',⍕rslt
-                    :EndIf
+                        Msgs.ERR USend ⍕⎕DMX.(EM Message)
+                    :EndTrap
+
+                    ⍝ 'EXEC' message
+                :Case Msgs.EXEC
+
+                    ⍝ split the message by newlines
+                    pyaplns.∆∆∆∆∆←(~mdata∊⎕ucs 10 13)⊆mdata
+
+
+                    :Trap 0
+                        rslt←pyaplns⍎'⎕FX ∆∆∆∆∆'
+                        :If ''≡0↑rslt
+                            Msgs.OK USend rslt
+                        :Else
+                            Msgs.ERR USend 'Error on line ',⍕rslt
+                        :EndIf
+                    :Else
+                        Msgs.ERR USend ⍕⎕DMX.(EM Message)
+                    :EndTrap
+
+
+                    ⍝ 'EVAL' message
+                :Case Msgs.EVAL
+                    :Trap 0
+
+                        in←deserialize mdata
+
+                        ⍝check message format
+                        :If 2≠≢in
+                            Msgs.ERR USend 'Malformed EVAL message'
+                            :Return
+                        :EndIf
+
+                        expr args←in
+
+                        ⍝namespace to run the expr in
+
+                        ⍝ expose the arguments and this class for communication with Python
+                        pyaplns.∆←args
+                        pyaplns.py←⎕THIS 
+
+                        ⍝ send the result back
+                        rslt←pyaplns⍎expr                   
+
+                        Msgs.EVALRET USend serialize rslt
+                    :Else
+                        Msgs.ERR USend ⍕⎕DMX.(EM Message)
+                    :EndTrap
+
+                    ⍝ Debug serialization round trip
+                :Case Msgs.DBGSerializationRoundTrip
+                    :Trap 0
+                        mtype USend serialize deserialize mdata
+                    :Else
+                        Msgs.ERR USend ⍕⎕DMX.(EM Message)
+                    :EndTrap
+
                 :Else
-                    Msgs.ERR USend ⍕⎕DMX.(EM Message)
-                :EndTrap
-
-
-                ⍝ 'EVAL' message
-            :Case Msgs.EVAL
-                :Trap 0
-
-                    in←deserialize mdata
-
-                    ⍝check message format
-                    :If 2≠≢in
-                        Msgs.ERR USend 'Malformed EVAL message'
-                        :Return
-                    :EndIf
-
-                    expr args←in
-
-                    ⍝namespace to run the expr in
-
-                    ⍝ expose the arguments and this class for communication with Python
-                    pyaplns.∆←args
-                    pyaplns.py←⎕THIS 
-
-                    ⍝ send the result back
-                    rslt←pyaplns⍎expr                   
-
-                    Msgs.EVALRET USend serialize rslt
-                :Else
-                    Msgs.ERR USend ⍕⎕DMX.(EM Message)
-                :EndTrap
-
-                ⍝ Debug serialization round trip
-            :Case Msgs.DBGSerializationRoundTrip
-                :Trap 0
-                    mtype USend serialize deserialize mdata
-                :Else
-                    Msgs.ERR USend ⍕⎕DMX.(EM Message)
-                :EndTrap
+                    Msgs.ERR USend 'Message not implemented #',⍕mtype
+                :EndSelect
 
             :Else
-                Msgs.ERR USend 'Message not implemented #',⍕mtype
-            :EndSelect
+                Msgs.ERR USend 'Interrupt'
+            :EndTrap 
         ∇
         ⍝ debug function (eval/repr)
         ∇ str←Repr code;mtype;recv

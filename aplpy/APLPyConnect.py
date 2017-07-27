@@ -7,7 +7,7 @@
 #   0     1  2  3  4         ......
 #   TYPE  SIZE (big-endian)  MESSAGE (`size` bytes, expected to be UTF-8 encoded)
 
-import socket, os, time, types
+import socket, os, time, types, signal
 import RunDyalog
 from Array import *
 
@@ -28,7 +28,6 @@ class Message(object):
     EVALRET=11 # message containing the result of an evaluation
 
     DBGSerializationRoundTrip = 253 # 
-    DBG=254    # print message on stdout and send it back
     ERR=255    # Python error
 
     MAX_LEN = 2**32-1
@@ -45,35 +44,53 @@ class Message(object):
 
     def send(self, writer):
         """Send a message using a writer"""
-        b4 = (len(self.data) & 0xFF000000) >> 24
-        b3 = (len(self.data) & 0x00FF0000) >> 16
-        b2 = (len(self.data) & 0x0000FF00) >> 8
-        b1 = (len(self.data) & 0x000000FF) >> 0
-        writer.write("%c%c%c%c%c%s" % (self.type,b4,b3,b2,b1,self.data))
-        writer.flush()
+
+        # turn off interrupt signal handler temporarily
+        s = signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+        try:
+            b4 = (len(self.data) & 0xFF000000) >> 24
+            b3 = (len(self.data) & 0x00FF0000) >> 16
+            b2 = (len(self.data) & 0x0000FF00) >> 8
+            b1 = (len(self.data) & 0x000000FF) >> 0
+            writer.write("%c%c%c%c%c%s" % (self.type,b4,b3,b2,b1,self.data))
+            writer.flush()
+        finally:
+            signal.signal(signal.SIGINT, s) 
 
     @staticmethod
     def recv(reader):
         """Read a message from a reader"""
 
-        # read the header
+        s = None
+        setsgn = False
+        
         try:
-            mtype = ord(reader.read(1))
-            lfield = map(ord, reader.read(4))
-            length = (lfield[0]<<24) + (lfield[1]<<16) + (lfield[2]<<8) + lfield[3]
-        except (TypeError, IndexError, ValueError):
-            raise MalformedMessage("out of data while reading message header")
+            # read the header
+            try:
+                mtype = ord(reader.read(1))
+                # once we've started reading, finish reading: turn off the interrupt handler
+                setsgn, s = True, signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-        # read the data
-        try:
-            data = reader.read(length)
-        except ValueError:
-            raise MalformedMessage("out of data while reading message body")
+                lfield = map(ord, reader.read(4))
+                length = (lfield[0]<<24) + (lfield[1]<<16) + (lfield[2]<<8) + lfield[3]
+            except (TypeError, IndexError, ValueError):
+                raise MalformedMessage("out of data while reading message header")
 
-        if len(data) != length:
-            raise MalformedMessage("out of data while reading message body")
+            # read the data
+            try:
+                data = reader.read(length)
+            except ValueError:
+                raise MalformedMessage("out of data while reading message body")
 
-        return Message(mtype, data)
+            if len(data) != length:
+                raise MalformedMessage("out of data while reading message body")
+
+            return Message(mtype, data)
+        finally:
+            # turn the interrupt handler back on if we'd turned it off
+            if setsgn:
+                signal.signal(signal.SIGINT, s)
 
 class PyEvaluator(object):
     """Evaluate a Python expression"""
@@ -182,9 +199,11 @@ class PyEvaluator(object):
 class Connection(object):
     """A connection"""
     
-    pid=None
+    #pid=None
 
     class APL(object):
+        pid=None
+
         """Represents the APL interpreter."""
         def __init__(self, conn):
             self.conn=conn
@@ -297,6 +316,11 @@ class Connection(object):
 
             return __op
 
+        def interrupt(self):
+            """Send a strong interrupt to the Dyalog interpreter."""
+            # TODO: windows support?
+            if self.pid:
+                os.kill(self.pid, signal.SIGINT)
 
 
         def tradfn(self, tradfn):
@@ -418,16 +442,29 @@ class Connection(object):
            is received, return it; if a different message is received, then
            handle it and go back to waiting for the right type of message."""
 
-        while True:
-            msg = Message.recv(self.sockfile)
+        while True: 
+            try:
+                msg = Message.recv(self.sockfile)
 
-            if msg.type in (msgtype, Message.ERR):
-                return msg
-            else:
-                self.respond(msg)
-
+                if msg.type in (msgtype, Message.ERR):
+                    return msg
+                else:
+                    self.respond(msg)
+            except KeyboardInterrupt:
+                self.apl.interrupt()
 
     def respond(self, message):
+        # Add ctrl+c signal handling
+        try:
+            self.respond_inner(message)
+        except KeyboardInterrupt:
+            # If there is an interrupt during 'respond', then that means
+            # the Python side was interrupted, and we need to tell the
+            # APL this.
+            Message(Message.ERR, "Interrupt").send(self.sockfile)
+
+
+    def respond_inner(self, message):
         """Respond to a message"""
         
         t = message.type
