@@ -326,9 +326,26 @@
             :EndTrap
         ∇           
 
-        ∇ Interrupt ignored
+        ∇ Interrupt pid
+            ⍝ Just to be inconsistent, this function _does_ use the PID that is
+            ⍝ passed in. There's somewhat of a reason for it: it makes debugging
+            ⍝ a little easier.
             :Access Public Instance
-            'Not implemented' ⎕SIGNAL 16
+                               
+            ⍝ Windows kernel black magic
+            '⍙AC'⎕NA'U4 kernel32|AttachConsole U4'
+            '⍙FC'⎕NA'U4 kernel32|FreeConsole'
+            '⍙GCCE'⎕NA'U4 kernel32|GenerateConsoleCtrlEvent U4 U4'
+            '⍙SCCH'⎕NA'P kernel32|SetConsoleCtrlHandler P U4' 
+        
+            :If ⍙AC pid ⍝ attach a console to Python
+                {}⍙SCCH 0 1 ⍝ turn off our own ctrl handler
+                {}⍙GCCE 0 0 ⍝ ctrl+c to Python
+                ⎕DL÷4 ⍝ it takes Windows a while to process it
+                {}⍙FC ⍬ ⍝ free the console
+            :Else
+                ⎕←'Failed to attach to process. Interrupt not sent.'
+            :EndIf 
         ∇
 
     :EndClass
@@ -563,7 +580,7 @@
 
             ⍝ Receive message. Will also signal Python on interrupt, if the Python is ours
             ⍝ Message fmt: X L L L L Data
-            ∇ (success mtype recv)←Recv;done;wait_ret;rc;obj;event;sdata;tmp;interrupt;itr_ret
+            ∇ (success mtype recv)←Recv;done;wait_ret;rc;obj;event;sdata;tmp;interrupt;itr_ret;threadState
                 'Inactive instance' ⎕SIGNAL BROKEN when ~ready
                 
                 interrupt←0
@@ -604,7 +621,10 @@
                             :EndIf
                             interrupt_handled:
                             
+                            ⍝ don't break while in Conga 
+                            threadState←2503⌶1
                             rc←⊃wait_ret←#.DRC.Wait connSocket
+                            {}2503⌶threadState
 
                             :If rc=0 ⍝ success
                                 rc obj event sdata←wait_ret
@@ -649,7 +669,6 @@
                         ⍝ 2⊃⎕DM contains: Recv[lineno] INTERRUPT .....
                         ⍝ we need to jump to 'lineno'
                         ⍎1↓(+\+⌿1 ¯1×[1]'[]'∘.=r)/r←(∧\' '≠⍵)/⍵
-                        ⍝ TODO: find some nice code injection vulnerability here
                     }2⊃⎕DM
                 :EndTrap
 
