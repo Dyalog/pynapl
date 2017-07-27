@@ -12,7 +12,7 @@ import APLPyConnect as C
 if __name__=="__main__":
     port = int(sys.argv[1])
 
-    os.setpgrp()
+    if hasattr(os, 'setpgrp'): os.setpgrp()
     signal.signal(signal.SIGINT, signal.default_int_handler)
 
     print "Connecting to APL at port %d" % port
