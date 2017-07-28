@@ -25,9 +25,20 @@ def cyg_convert_path(path, type):
     return Popen(["cygpath",type,path],stdout=PIPE).communicate()[0].split("\n")[0]
     
 def win_dythread(dyalog, cygwin=False):
+
+    startupinfo = None
+    
+    if not cygwin:
+        # hide the window
+        # imported here because STARTUPINFO only exists on Windows
+        import subprocess
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwflags = subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0
+        
     path=os.path.dirname(SCRIPTFILE)+'/WinPySlave.dyapp'
     if cygwin: path=cyg_convert_path(path, "--windows") 
-    Popen([dyalog, 'DYAPP='+path]).communicate()
+    Popen([dyalog, 'DYAPP='+path], startupinfo=startupinfo).communicate()
     
 def cygwin_find_dyalog():
     # the horrible bastard child of two operating systems

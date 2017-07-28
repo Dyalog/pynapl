@@ -6,23 +6,18 @@ import thread
 pidMainWindows = {}
 
 def interrupt(pid):
-    print "Windows interrupt - %d" % pid
     """Tell the Dyalog window to interrupt"""
-    
-    if not pid in pidMainWindows:
-        # find the associated window and store it
-        hwnd = findWindow(pid)
-        if hwnd is None:
-            raise RuntimeError("could not locate the main window")
-        else:
-            pidMainWindows[pid]=hwnd
-            
-    interruptWindow(pidMainWindows[pid])
-	
 
+    interruptWindow(findWindow(pid))
+
+def hide(pid):
+    hwnd = findWindow(pid)
+    windll.user32.ShowWindow(hwnd, False)
+    
 def findWindow(pid):
-    print "findWindow - ",
     """Find the Dyalog window associated with the given process"""
+    
+    if pid in pidMainWindows: return pidMainWindows[pid]
     
     user32 = windll.user32
     cur_pid = c_uint()
@@ -45,7 +40,7 @@ def findWindow(pid):
             # "Dyalog APL" is in the title...
             if "Dyalog APL" in title.value:
                 # this is the one
-                print curwnd
+                pidMainWindows[pid] = curwnd
                 return curwnd
 		
         # try the next window
@@ -54,7 +49,6 @@ def findWindow(pid):
     return None # couldn't find it
 	
 def interruptWindow(hwnd):
-    print "interrupt %d" % hwnd
     """Tell Dyalog APL to interrupt the running code.
     
     hwnd must be the handle to the main Dyalog window."""

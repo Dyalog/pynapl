@@ -8,7 +8,7 @@
 #   TYPE  SIZE (big-endian)  MESSAGE (`size` bytes, expected to be UTF-8 encoded)
 
 import socket, os, time, types, signal, threading, select
-import RunDyalog, Interrupt
+import RunDyalog, Interrupt, WinDyalog
 from Array import *
 
 class APLError(Exception): pass
@@ -428,6 +428,10 @@ class Connection(object):
             if DEBUG:print "Ok! pid=%d" % pid
             apl = connobj.apl
             apl.pid = pid
+            
+            # if we are on Windows, hide the window
+            if os.name=='nt': WinDyalog.hide(pid)
+            
             return apl
 
     def __init__(self, socket, signon=True):
