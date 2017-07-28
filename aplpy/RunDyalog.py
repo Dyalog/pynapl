@@ -110,7 +110,7 @@ def dystart(port, dyalog=None):
         
         # This is a horrible hack
         # Write the necessary port to a dyalog script
-        with file(os.path.dirname(SCRIPTFILE)+'/WinPort.dyalog', "w") as f:
+        with open(os.path.dirname(SCRIPTFILE)+'/WinPort.dyalog', "w") as f:
             f.write("""
                 :Namespace WinPort
                 port←%d
