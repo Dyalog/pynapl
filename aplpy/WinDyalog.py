@@ -1,10 +1,30 @@
 # Code to communicate with the Windows version of Dyalog
 
 from ctypes import *
-import thread
+from subprocess import Popen, PIPE
+import thread, os
+
 
 pidMainWindows = {}
 
+# find the library
+try:
+    user32 = windll.user32
+except NameError:
+    # this might be Cygwin
+    try:
+        user32dll_winpath = os.environ['WINDIR'] + r'\System32\User32.dll'
+        user32dll_cygpath = Popen(['cygpath','--unix',user32dll_winpath],
+                             stdout=PIPE).communicate()[0].split("\n")[0]
+        user32 = cdll.LoadLibrary(user32dll_cygpath)
+    except KeyError, OSError:
+        # not Windows at all
+        class X(object):
+            def __getattr__(self,attr):
+                raise RuntimeError("Cannot call Windows functions from Unix (%s)." % attr)
+    
+        user32 = X()
+    
 def interrupt(pid):
     """Tell the Dyalog window to interrupt"""
 
@@ -12,14 +32,13 @@ def interrupt(pid):
 
 def hide(pid):
     hwnd = findWindow(pid)
-    windll.user32.ShowWindow(hwnd, False)
+    user32.ShowWindow(hwnd, False)
     
 def findWindow(pid):
     """Find the Dyalog window associated with the given process"""
     
     if pid in pidMainWindows: return pidMainWindows[pid]
     
-    user32 = windll.user32
     cur_pid = c_uint()
     
     # Get a handle to the desktop and scan all its children
@@ -52,7 +71,7 @@ def interruptWindow(hwnd):
     """Tell Dyalog APL to interrupt the running code.
     
     hwnd must be the handle to the main Dyalog window."""
-    thread.start_new_thread(windll.user32.PostMessageA,(hwnd, 273, 133, 0))
+    thread.start_new_thread(user32.PostMessageA,(hwnd, 273, 133, 0))
     # 273 = WM_COMMAND
     # 133 = the Actions -> Interrupt menu
 	

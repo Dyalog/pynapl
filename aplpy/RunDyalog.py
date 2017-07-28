@@ -27,18 +27,26 @@ def cyg_convert_path(path, type):
 def win_dythread(dyalog, cygwin=False):
 
     startupinfo = None
+    preexec_fn = None
     
     if not cygwin:
+        # not cygwin 
         # hide the window
         # imported here because STARTUPINFO only exists on Windows
         import subprocess
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwflags = subprocess.STARTF_USESHOWWINDOW
         startupinfo.wShowWindow = 0
+    elif cygwin:
+        # cygwin: we need to setpgrp like on Linux or Dyalog will crash
+        preexec_fn = os.setpgrp 
+    
         
     path=os.path.dirname(SCRIPTFILE)+'/WinPySlave.dyapp'
     if cygwin: path=cyg_convert_path(path, "--windows") 
-    Popen([dyalog, 'DYAPP='+path], startupinfo=startupinfo).communicate()
+    Popen([dyalog, 'DYAPP='+path], 
+          startupinfo=startupinfo,
+          preexec_fn=preexec_fn).communicate()
     
 def cygwin_find_dyalog():
     # the horrible bastard child of two operating systems
