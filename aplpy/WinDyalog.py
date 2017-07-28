@@ -17,7 +17,7 @@ except NameError:
         user32dll_cygpath = Popen(['cygpath','--unix',user32dll_winpath],
                              stdout=PIPE).communicate()[0].split("\n")[0]
         user32 = cdll.LoadLibrary(user32dll_cygpath)
-    except KeyError, OSError:
+    except (KeyError, OSError):
         # not Windows at all
         class X(object):
             def __getattr__(self,attr):

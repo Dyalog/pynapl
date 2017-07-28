@@ -324,10 +324,8 @@ class Connection(object):
 
         def interrupt(self):
             """Send a strong interrupt to the Dyalog interpreter."""
-            # TODO: windows support?
             if self.pid:
-                #os.kill(self.pid, signal.SIGINT)
-				Interrupt.interrupt(self.pid)
+                Interrupt.interrupt(self.pid)
 
         def tradfn(self, tradfn):
             """Define a tradfn or tradop on the APL side.
@@ -497,7 +495,7 @@ class Connection(object):
             try:
                 val = repr(eval(message.data))
                 Message(Message.REPRRET, val).send(self.sockfile)
-            except Exception, e:
+            except Exception as e:
                 Message(Message.ERR, repr(e)).send(self.sockfile)
 
         elif t==Message.EXEC:
@@ -507,7 +505,7 @@ class Connection(object):
                 globals()['APL']=self.apl
                 exec code in globals()
                 Message(Message.OK, '').send(self.sockfile)
-            except Exception, e:
+            except Exception as e:
                 Message(Message.ERR, repr(e)).send(self.sockfile)
 
 
@@ -537,7 +535,7 @@ class Connection(object):
 
                 result = PyEvaluator(code, args, self).go().toJSONString()
                 Message(Message.EVALRET, result).send(self.sockfile)
-            except Exception, e:
+            except Exception as e:
                 #raise
                 Message(Message.ERR, repr(e)).send(self.sockfile)
 
@@ -555,7 +553,7 @@ class Connection(object):
                 print "---------------"
 
                 Message(Message.DBGSerializationRoundTrip, serialized).send(self.sockfile)
-            except IndexError, e: #Exception, e:
+            except Exception as e:
                 Message(Message.ERR, repr(e)).send(self.sockfile)          
         else:
             Message(Message.ERR, "unknown message type #%d / data:%s"%(message.type,message.data)).send(self.sockfile)
