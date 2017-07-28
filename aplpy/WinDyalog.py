@@ -1,6 +1,7 @@
 # Code to communicate with the Windows version of Dyalog
 
 from ctypes import *
+import thread
 
 pidMainWindows = {}
 
@@ -57,7 +58,7 @@ def interruptWindow(hwnd):
     """Tell Dyalog APL to interrupt the running code.
     
     hwnd must be the handle to the main Dyalog window."""
-    windll.user32.SendMessageA(hwnd, 273, 133, 0)
+    thread.start_new_thread(windll.user32.PostMessageA,(hwnd, 273, 133, 0))
     # 273 = WM_COMMAND
     # 133 = the Actions -> Interrupt menu
 	

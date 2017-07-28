@@ -7,7 +7,7 @@
 #   0     1  2  3  4         ......
 #   TYPE  SIZE (big-endian)  MESSAGE (`size` bytes, expected to be UTF-8 encoded)
 
-import socket, os, time, types, signal
+import socket, os, time, types, signal, threading, select
 import RunDyalog, Interrupt
 from Array import *
 
@@ -66,6 +66,11 @@ class Message(object):
         setsgn = False
         
         try:
+            # wait for message available
+            while True:
+                ready = select.select([reader], [], [], 0.5)
+                if ready[0]: break
+            
             # read the header
             try:
                 mtype = ord(reader.read(1))
@@ -198,6 +203,7 @@ class PyEvaluator(object):
 
 class Connection(object):
     """A connection"""
+
     
     #pid=None
 
@@ -428,6 +434,7 @@ class Connection(object):
         self.socket = socket
         self.sockfile = socket.makefile()
         self.apl = Connection.APL(self)
+        self.__interrupt_lock = threading.Lock()
         if signon:
             Message(Message.PID, str(os.getpid())).send(self.sockfile)
 
@@ -441,7 +448,7 @@ class Connection(object):
         """Expect a certain type of message. If such a message or an error
            is received, return it; if a different message is received, then
            handle it and go back to waiting for the right type of message."""
-
+            
         while True: 
             try:
                 msg = Message.recv(self.sockfile)
