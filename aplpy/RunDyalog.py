@@ -3,7 +3,7 @@
 
 from __future__ import absolute_import 
 
-import os, thread, platform
+import os, threading, platform
 from subprocess import Popen, PIPE
 
 SCRIPTFILE=os.path.realpath(__file__)
@@ -100,7 +100,11 @@ def dystart(port, dyalog=None):
     if os.name=='posix' and not 'CYGWIN' in platform.system():
         if not dyalog: dyalog="dyalog" # assume it's just on the path
         
-        thread.start_new_thread(posix_dythread, (port,), {"dyalog":dyalog})
+        #thread.start_new_thread(posix_dythread, (port,), {"dyalog":dyalog})
+        t=threading.Thread(target=lambda:posix_dythread(port,dyalog=dyalog))
+        t.daemon=True
+        t.start()
+
     elif os.name=='nt' or 'CYGWIN' in platform.system():
         
         # look up dyalog in registry
@@ -119,9 +123,14 @@ def dystart(port, dyalog=None):
                 :EndNamespace
             """%port)
        
-        thread.start_new_thread(win_dythread, (), {"dyalog":dyalog, 
-                            'cygwin':'CYGWIN' in platform.system()})
-        
+        #thread.start_new_thread(win_dythread, (), {"dyalog":dyalog, 
+        #                    'cygwin':'CYGWIN' in platform.system()})
+        t=threading.Thread(
+                       target=lambda:win_dythread(dyalog=dyalog,
+                       cygwin='CYGWIN' in platform.system())).start()
+
+        t.daemon=True
+        t.start()
         #Popen([dyalog, 'WinPySlave.dyapp'], stdin=None, stdout=None, stderr=None, close_fds=True)
         
     else:

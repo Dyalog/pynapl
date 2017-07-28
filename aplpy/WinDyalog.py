@@ -3,7 +3,7 @@
 from __future__ import absolute_import
 from ctypes import *
 from subprocess import Popen, PIPE
-import thread, os
+import threading, os
 
 
 pidMainWindows = {}
@@ -72,7 +72,8 @@ def interruptWindow(hwnd):
     """Tell Dyalog APL to interrupt the running code.
     
     hwnd must be the handle to the main Dyalog window."""
-    thread.start_new_thread(user32.PostMessageA,(hwnd, 273, 133, 0))
+    threading.Thread(target=lambda:user32.PostMessageA(hwnd, 273, 133, 0)).start()
+
     # 273 = WM_COMMAND
     # 133 = the Actions -> Interrupt menu
 	
