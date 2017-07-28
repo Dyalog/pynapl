@@ -1,6 +1,7 @@
 # Utility functions
 
 from __future__ import absolute_import
+from functools import reduce
 
 import operator
 
