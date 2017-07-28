@@ -193,7 +193,7 @@ class PyEvaluator(object):
 
     def go(self):
         local = {'args':self.pyargs, 'retval':None, 'code':self.expr, 'APL':self.conn.apl}
-        exec self.wrapper in globals(), local
+        exec(self.wrapper, globals(), local)
         retval = local['retval']
         if not isinstance(retval, APLArray):
             retval = APLArray.from_python(retval)
@@ -503,7 +503,7 @@ class Connection(object):
             try:
                 code = compile(message.data, '<APL>', 'exec')
                 globals()['APL']=self.apl
-                exec code in globals()
+                exec(code,globals())
                 Message(Message.OK, '').send(self.sockfile)
             except Exception as e:
                 Message(Message.ERR, repr(e)).send(self.sockfile)
