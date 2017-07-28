@@ -1,6 +1,7 @@
 # Platform-specific code to send interrupts to an APL instance 
 
-import WinDyalog
+from __future__ import absolute_import
+from . import WinDyalog
 import os, platform, signal  
 
 def interrupt(pid):

@@ -3,13 +3,20 @@
 # This program will connect to the APL side,
 # after which it will execute commands given to it.
 
+from __future__ import absolute_import
+
 import socket
 import sys
 import os
 import signal
-import APLPyConnect as C
+
+# make sure to load the module this file is actually located in 
+sys.path.insert(1,'../')
+
+from aplpy import APLPyConnect as C
 
 if __name__=="__main__":
+    
     port = int(sys.argv[1])
 
     if hasattr(os, 'setpgrp'): os.setpgrp()

@@ -7,9 +7,11 @@
 #   0     1  2  3  4         ......
 #   TYPE  SIZE (big-endian)  MESSAGE (`size` bytes, expected to be UTF-8 encoded)
 
+from __future__ import absolute_import 
+
 import socket, os, time, types, signal, threading, select
-import RunDyalog, Interrupt, WinDyalog
-from Array import *
+from . import RunDyalog, Interrupt, WinDyalog
+from .Array import *
 
 class APLError(Exception): pass
 class MalformedMessage(Exception): pass

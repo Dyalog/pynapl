@@ -1,6 +1,8 @@
 # Run a Dyalog instance in the background and start the Python client
 # -*- coding: utf-8 -*-
 
+from __future__ import absolute_import 
+
 import os, thread, platform
 from subprocess import Popen, PIPE
 

@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import absolute_import
 
 import operator
 import json
 import codecs
 import collections
 
-from Util import *
+from .Util import *
 
 # assuming ⎕IO=0 for now
 class APLNamespace(object):

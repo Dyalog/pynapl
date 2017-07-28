@@ -2,8 +2,9 @@
 
 """Dyalog APL <> Python bridge"""
 
-import Array
-import APLPyConnect
+from __future__ import absolute_import
+from . import Array
+from . import APLPyConnect
 
 def APL(debug=False, dyalog=None):
     """Start an APL interpreter
