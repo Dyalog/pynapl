@@ -8,7 +8,7 @@
 #   TYPE  SIZE (big-endian)  MESSAGE (`size` bytes, expected to be UTF-8 encoded)
 
 import socket, os, time, types, signal
-import RunDyalog
+import RunDyalog, Interrupt
 from Array import *
 
 class APLError(Exception): pass
@@ -320,8 +320,8 @@ class Connection(object):
             """Send a strong interrupt to the Dyalog interpreter."""
             # TODO: windows support?
             if self.pid:
-                os.kill(self.pid, signal.SIGINT)
-
+                #os.kill(self.pid, signal.SIGINT)
+				Interrupt.interrupt(self.pid)
 
         def tradfn(self, tradfn):
             """Define a tradfn or tradop on the APL side.
