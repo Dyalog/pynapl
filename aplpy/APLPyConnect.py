@@ -9,7 +9,7 @@
 
 from __future__ import absolute_import 
 
-import socket, os, time, types, signal, threading, select
+import socket, os, time, types, signal, select
 from . import RunDyalog, Interrupt, WinDyalog
 from .Array import *
 
@@ -438,7 +438,6 @@ class Connection(object):
         self.socket = socket
         self.sockfile = socket.makefile()
         self.apl = Connection.APL(self)
-        self.__interrupt_lock = threading.Lock()
         if signon:
             Message(Message.PID, str(os.getpid())).send(self.sockfile)
 
