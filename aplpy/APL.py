@@ -3,6 +3,8 @@
 """Dyalog APL <> Python bridge"""
 
 from __future__ import absolute_import
+from __future__ import division
+
 from . import Array
 from . import APLPyConnect
 

@@ -1,6 +1,8 @@
 # Code to communicate with the Windows version of Dyalog
 
 from __future__ import absolute_import
+from __future__ import division
+
 from ctypes import *
 from subprocess import Popen, PIPE
 import threading, os

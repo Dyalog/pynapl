@@ -1,6 +1,8 @@
 # Platform-specific code to send interrupts to an APL instance 
 
 from __future__ import absolute_import
+from __future__ import division
+
 from . import WinDyalog
 import os, platform, signal  
 
