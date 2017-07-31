@@ -96,7 +96,7 @@ class APLArray(object):
             return jsobj
     
     # define a reusable json decoder
-    _json_decoder = json.JSONDecoder(encoding="utf8", object_hook=__json_object_hook)
+    _json_decoder = json.JSONDecoder(object_hook=__json_object_hook)
 
 
     # convert array to suitable-ish python representation
@@ -293,6 +293,7 @@ class APLArray(object):
 
     @staticmethod 
     def fromJSONString(string):
+        if type(string) is bytes: string = str(string, 'utf8')
         return APLArray._json_decoder.decode(string)
 
 # serialize an array using JSON

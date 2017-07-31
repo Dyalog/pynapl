@@ -12,8 +12,8 @@ def interrupt(pid):
         # standard Windows, use the Windows API
         WinDyalog.interrupt(pid)
     elif os.name=='posix' and not 'CYGWIN' in platform.system():
-		# standard Unix, send SIGINT 
-		os.kill(pid, signal.SIGINT)
+        # standard Unix, send SIGINT 
+        os.kill(pid, signal.SIGINT)
     else:
         raise RuntimeError("OS not supported")
 		

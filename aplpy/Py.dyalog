@@ -194,7 +194,7 @@
             r←(⌽∨\⌽'/'=fname)/fname
         ∇
 
-        ∇ {py} StartPython (program srvport);cmd;pypath
+        ∇ {py} StartPython (program srvport majorVersion);cmd;pypath
             :Access Public Shared
             :If 2=⎕NC'py'
             :andif 0≠≢py
@@ -203,7 +203,7 @@
             :else
                 ⍝find python on path
                 :Trap 11
-                    pypath←⊃⎕SH'which python'
+                    pypath←⊃⎕SH'which python',∊(majorVersion>2)↑⊂⍕majorVersion
                 :Else
                     ⎕SIGNAL⊂('EN'999)('Message' 'Cannot find Python on the path.')
                 :EndTrap
@@ -245,7 +245,7 @@
             r←(⌽∨\⌽'\'=fname)/fname
         ∇
 
-        ∇ {py} StartPython (program srvport);pypath
+        ∇ {py} StartPython (program srvport majorVersion);pypath
             :Access Public Instance
             ⍝⎕USING←'System.Diagnostics,System.dll'
             ⍝⎕USING,←⊂'Microsoft.Win32,mscorlib.dll' 
@@ -254,14 +254,14 @@
             :andIf 0≠≢py
                 ⍝ use given path
                 pypath←py
-            :ElseIf 0=≢pypath←FindPythonInRegistry 
+            :ElseIf 0=≢pypath←FindPythonInRegistry majorVersion
                 ⍝ can't find it in registry either
                 ⎕SIGNAL⊂('EN'999)('Message' 'Cannot find Python in registry.')
             :EndIf
 
 
             :Trap 90  
-              
+
                 pyProcess←⎕NEW Process
                 pyProcess.StartInfo.FileName←pypath
                 pyProcess.StartInfo.Arguments←program,' ',⍕srvport  
@@ -275,10 +275,9 @@
             :EndTrap
         ∇
 
-        ∇ path←FindPythonInRegistry;majorVersion;rk;rka;rkb;comp;ver
-            :Access Public Shared             
-            majorVersion←2 ⍝ for now, use Python version 2
-
+        ∇ path←FindPythonInRegistry majorVersion;rk;rka;rkb;comp;ver
+            :Access Public Shared   
+            
             ⍝ attempt to find Python in the registry
             ⍝ (see: https://www.python.org/dev/peps/pep-0514/)
 
@@ -309,7 +308,7 @@
             comp←rk.GetSubKeyNames~⊂'PyLauncher'
             comp←⊃comp[⍒comp≡¨⊂'PythonCore']
             rk←rk.OpenSubKey(comp 0)          ⋄ →('[Null]'≡⍕rk)/fail
-            
+
             ⍝ find highest installed version matching major version
             ver←{
                 vers←{⊃⊃(//)⎕VFI(∧\⍵∊⎕D,'.')/⍵}¨⍵
@@ -346,13 +345,13 @@
             ⍝ passed in. There's somewhat of a reason for it: it makes debugging
             ⍝ a little easier.
             :Access Public Instance
-                               
+
             ⍝ Windows kernel black magic
             '⍙AC'⎕NA'U4 kernel32|AttachConsole U4'
             '⍙FC'⎕NA'U4 kernel32|FreeConsole'
             '⍙GCCE'⎕NA'U4 kernel32|GenerateConsoleCtrlEvent U4 U4'
             '⍙SCCH'⎕NA'P kernel32|SetConsoleCtrlHandler P U4' 
-        
+
             :If ⍙AC pid ⍝ attach a console to Python
                 {}⍙SCCH 0 1 ⍝ turn off our own ctrl handler
                 {}⍙GCCE 0 0 ⍝ ctrl+c to Python
@@ -395,6 +394,12 @@
         ⍝ to connect to an external APLBridgeSlave.py rather than launch
         ⍝ one.
         :Field Private debugConnect←0
+        
+        ⍝ Major version of Python to use. Default: 2
+        ⍝ This only really matters for which interpreter to launch,
+        ⍝ the APL side of the code does not (currently) care about the
+        ⍝ difference.
+        :Field Private majorVersion←2
 
         ∇ r←GetLastError
             :Access Public
@@ -597,87 +602,87 @@
             ⍝ Message fmt: X L L L L Data
             ∇ (success mtype recv)←Recv;done;wait_ret;rc;obj;event;sdata;tmp;interrupt;itr_ret;threadState
                 'Inactive instance' ⎕SIGNAL BROKEN when ~ready
-                
+
                 interrupt←0
-                
+
                 :Trap 1000
 
-                :Repeat
-                    :If (~reading) ∧ 5≤≢curdata
-                        ⍝ we're not in a message and have data available for the header
-                        curtype←⊃curdata ⍝ first byte is the type
-                        curlen←256⊥4↑1↓curdata ⍝ next 4 bytes are the length
-                        curdata↓⍨←5
-                        ⍝ we are now reading the message body
-                        reading←1
-                    :ElseIf reading ∧ curlen ≤ ≢curdata
-                        ⍝ we're in a message and have enough data to complete it
-                        (success mtype recv)←1 curtype (curlen↑curdata)
-                        curdata ↓⍨← curlen
-                        ⍝ therefore, we are no longer reading a message
-                        reading←0
-                        
-                        ⍝ if the interupt was not handled yet, do it now
-                        ⍝ since it arose while waiting for data, we need to signal Python
-                        :If interrupt
-                            itr_ret←0 ⍝ we can jump out afterwards
-                            →handle_interrupt
-                        :EndIf
-                        
-                        :Return
-                    :Else
-                        ⍝ we don't currently have enough data for what we need
-                        ⍝ (either a message or a header), so we need to read more
+                    :Repeat
+                        :If (~reading) ∧ 5≤≢curdata
+                            ⍝ we're not in a message and have data available for the header
+                            curtype←⊃curdata ⍝ first byte is the type
+                            curlen←256⊥4↑1↓curdata ⍝ next 4 bytes are the length
+                            curdata↓⍨←5
+                            ⍝ we are now reading the message body
+                            reading←1
+                        :ElseIf reading ∧ curlen ≤ ≢curdata
+                            ⍝ we're in a message and have enough data to complete it
+                            (success mtype recv)←1 curtype (curlen↑curdata)
+                            curdata ↓⍨← curlen
+                            ⍝ therefore, we are no longer reading a message
+                            reading←0
 
-                        :Repeat
+                            ⍝ if the interupt was not handled yet, do it now
+                            ⍝ since it arose while waiting for data, we need to signal Python
                             :If interrupt
-                                itr_ret←interrupt_handled
+                                itr_ret←0 ⍝ we can jump out afterwards
                                 →handle_interrupt
                             :EndIf
-                            interrupt_handled:
-                            
-                            ⍝ don't break while in Conga 
-                            threadState←2503⌶1
-                            rc←⊃wait_ret←#.DRC.Wait connSocket
-                            {}2503⌶threadState
 
-                            :If rc=0 ⍝ success
-                                rc obj event sdata←wait_ret
-                                connSocket←obj
-                                :Select event
-                                :Case 'Block' ⍝ we have data
-                                    curdata ,← sdata
-                                    :Leave
-                                :CaseList 'BlockLast' 'Error'
-                                    ⍝ an error has occured
+                            :Return
+                        :Else
+                            ⍝ we don't currently have enough data for what we need
+                            ⍝ (either a message or a header), so we need to read more
+
+                            :Repeat
+                                :If interrupt
+                                    itr_ret←interrupt_handled
+                                    →handle_interrupt
+                                :EndIf
+                                interrupt_handled:
+
+                                ⍝ don't break while in Conga 
+                                threadState←2503⌶1
+                                rc←⊃wait_ret←#.DRC.Wait connSocket
+                                {}2503⌶threadState
+
+                                :If rc=0 ⍝ success
+                                    rc obj event sdata←wait_ret
+                                    connSocket←obj
+                                    :Select event
+                                    :Case 'Block' ⍝ we have data
+                                        curdata ,← sdata
+                                        :Leave
+                                    :CaseList 'BlockLast' 'Error'
+                                        ⍝ an error has occured
+                                        →error
+                                    :EndSelect
+                                :ElseIf rc=100 ⍝ timeout
+                                    {}⎕DL 0.5 ⍝ wait half a second and try again
+                                :Else ⍝ not a timeout and not success → error
                                     →error
-                                :EndSelect
-                            :ElseIf rc=100 ⍝ timeout
-                                {}⎕DL 0.5 ⍝ wait half a second and try again
-                            :Else ⍝ not a timeout and not success → error
-                                →error
-                            :EndIf
-                        :EndRepeat
-                    :EndIf
+                                :EndIf
+                            :EndRepeat
+                        :EndIf
 
 
 
-                :EndRepeat
-                    
+                    :EndRepeat
+
                 :Else
                     ⍝ there was an interrupt
                     ⍝ this is the worst thing I've done in a long time
                     ⍝ this idea was suggested to me
                     ⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝
-                    
+
                     ⍝ There has been an interrupt at this point, but given the stateful
                     ⍝ nature of this function, we can't just stop. We need to store it 
                     ⍝ and handle it later. Since Dyalog APL doesn't seem to have a
                     ⍝ 'no interrupts in here' block, we need to set a flag and then go back
                     ⍝ where we came from. 
-                    
+
                     interrupt←1
-                    
+
                     ⍝ but how to go back to where we came from?
                     ⍝ well...
                     →{
@@ -693,7 +698,7 @@
                 (success mtype recv)←0 ¯1 sdata
                 ready←0
                 :Return
-                
+
                 handle_interrupt:
                 interrupt←0
                 :If ⍬≢serverSocket
@@ -928,7 +933,7 @@
             spath←(os.GetPath #.Py.ScriptPath),filename
 
             :If ~debugConnect
-                pypath os.StartPython spath srvport
+                pypath os.StartPython spath srvport majorVersion
             :EndIf
 
             ready←1
@@ -974,7 +979,8 @@
                 :Case'PyPath' ⋄ pypath←val 
                     ⍝ construct a client instead of a server
                 :Case 'Client' ⋄ clport←val
-
+                    ⍝ set the Python major version
+                :Case 'Version' ⋄ majorVersion←val
                 :EndSelect
 
             :EndFor
@@ -989,7 +995,7 @@
         ∇ Stop
             :Access Public Instance
             ⍝ send a Stop message, we don't care if it succeeds
-            
+
             :Trap 0 ⋄ Msgs.STOP USend 'STOP' ⋄ :EndTrap
 
             :If 0≠≢serverSocket
