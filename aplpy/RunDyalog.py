@@ -127,7 +127,7 @@ def dystart(port, dyalog=None):
         #                    'cygwin':'CYGWIN' in platform.system()})
         t=threading.Thread(
                        target=lambda:win_dythread(dyalog=dyalog,
-                       cygwin='CYGWIN' in platform.system())).start()
+                       cygwin='CYGWIN' in platform.system()))
 
         t.daemon=True
         t.start()
