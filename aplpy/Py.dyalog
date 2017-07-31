@@ -260,7 +260,8 @@
             :EndIf
 
 
-            :Trap 90
+            :Trap 90  
+              
                 pyProcess←⎕NEW Process
                 pyProcess.StartInfo.FileName←pypath
                 pyProcess.StartInfo.Arguments←program,' ',⍕srvport  
@@ -274,8 +275,10 @@
             :EndTrap
         ∇
 
-        ∇ path←FindPythonInRegistry;rk;rka;rkb;comp;ver
-            :Access Public Shared
+        ∇ path←FindPythonInRegistry;majorVersion;rk;rka;rkb;comp;ver
+            :Access Public Shared             
+            majorVersion←2 ⍝ for now, use Python version 2
+
             ⍝ attempt to find Python in the registry
             ⍝ (see: https://www.python.org/dev/peps/pep-0514/)
 
@@ -299,9 +302,21 @@
             rk←rka ⋄ →foundPython
 
             foundPython:
-            comp←⊃rk.GetSubKeyNames
+            ⍝ this will get the first Python it finds, even if your Python
+            ⍝ is not from the official distribution (PythonCore)
+            ⍝ it will prefer PythonCore if it's in there
+            ⍝ PyLauncher is reserved and does not contain a Python, so it is dropped
+            comp←rk.GetSubKeyNames~⊂'PyLauncher'
+            comp←⊃comp[⍒comp≡¨⊂'PythonCore']
             rk←rk.OpenSubKey(comp 0)          ⋄ →('[Null]'≡⍕rk)/fail
-            ver←⊃{('2'=⊃¨⍵)/⍵}rk.GetSubKeyNames ⍝ version 2.x
+            
+            ⍝ find highest installed version matching major version
+            ver←{
+                vers←{⊃⊃(//)⎕VFI(∧\⍵∊⎕D,'.')/⍵}¨⍵
+                valid←majorVersion=⌊vers
+                (⊃⍒valid×vers)⊃⍵                
+            }rk.GetSubKeyNames  
+
             rk←rk.OpenSubKey(ver 0)           ⋄ →('[Null]'≡⍕rk)/fail    
             rk←rk.OpenSubKey('InstallPath' 0) ⋄ →('[Null]'≡⍕rk)/fail
             path←rk.GetValue⊂''
@@ -974,6 +989,7 @@
         ∇ Stop
             :Access Public Instance
             ⍝ send a Stop message, we don't care if it succeeds
+            
             :Trap 0 ⋄ Msgs.STOP USend 'STOP' ⋄ :EndTrap
 
             :If 0≠≢serverSocket

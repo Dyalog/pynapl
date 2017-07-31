@@ -14,7 +14,8 @@ import os
 import signal
 
 # make sure to load the module this file is actually located in 
-sys.path.insert(1,'../')
+mypath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.insert(1,mypath)
 
 from aplpy import APLPyConnect as C
 

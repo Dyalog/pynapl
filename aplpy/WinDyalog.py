@@ -2,23 +2,47 @@
 
 from __future__ import absolute_import
 from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals 
 
 from ctypes import *
 from subprocess import Popen, PIPE
-import threading, os
+import threading, os, sys
 
 
 pidMainWindows = {}
 
+# use Python 3 types on Python 2
+if sys.version_info.major == 2:
+    bytes, str = str, unicode 
+ 
+# convert to bytes
+def to_bytes(x):
+    if typeof(x) is str:
+        return x.encode('utf-8')
+    else:
+        return x
+
+def from_bytes(x):
+    if typeof(x) is bytes:
+        return str(x, 'utf-8')
+    else:
+        return x
+        
 # find the library
 try:
     user32 = windll.user32
 except NameError:
     # this might be Cygwin
     try:
-        user32dll_winpath = os.environ['WINDIR'] + r'\System32\User32.dll'
-        user32dll_cygpath = Popen(['cygpath','--unix',user32dll_winpath],
-                             stdout=PIPE).communicate()[0].split("\n")[0]
+        user32dll_winpath = to_bytes(os.environ['WINDIR']) + br'\System32\User32.dll'
+        user32dll_cygpath = Popen([b'cygpath',b'--unix',user32dll_winpath],
+                             stdout=PIPE).communicate()[0].split(b"\n")[0]
+                             
+        # On Python 2, the input should be a string of bytes; on Python 3
+        # it wants Unicode. 'Popen' works only with bytes in any case.
+        if sys.version_info.major >= 3:
+            user32dll_cygpath = from_bytes(user32dll_cygpath) 
         user32 = cdll.LoadLibrary(user32dll_cygpath)
     except (KeyError, OSError):
         # not Windows at all
@@ -35,7 +59,7 @@ def interrupt(pid):
 
 def hide(pid):
     hwnd = findWindow(pid)
-    user32.ShowWindow(hwnd, False)
+    #user32.ShowWindow(hwnd, False)
     
 def findWindow(pid):
     """Find the Dyalog window associated with the given process"""
