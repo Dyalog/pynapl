@@ -42,7 +42,8 @@ def posix_dythread(port, dyalog=b"dyalog"):
     
     # Run the Dyalog instance in this thread
     p=Popen([dyalog, b'-script'], stdin=PIPE, preexec_fn=os.setpgrp)
-    p.communicate(input=script.encode('utf8')%(path,port))
+    s=script%(pystr(path),port)
+    p.communicate(input=s.encode('utf8'))
 
 def cyg_convert_path(path, type):
     return Popen([b"cygpath",type,path],stdout=PIPE).communicate()[0].split(b"\n")[0]
