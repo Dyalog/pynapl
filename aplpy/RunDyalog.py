@@ -24,10 +24,19 @@ script="""
 """
 
 def to_bytes(x):
-    if type(x) is str: return x.encode('utf-8')
+    if not type(x) is bytes: return x.encode('utf-8')
     else: return x
+    
+def pystr(x):
+    """Given a string of bytes, returns either an ASCII string
+    or an Unicode string, depending on what the running version
+    of Python would expect."""
+    if type(x) is bytes:
+        if sys.version_info.major >= 3:
+            return str(x, "utf-8")
+    return x 
 
-def posix_dythread(port, dyalog="dyalog"):
+def posix_dythread(port, dyalog=b"dyalog"):
     # find the path, Py.dyalog should be in the same folder
     path=to_bytes(os.path.dirname(SCRIPTFILE))+b'/Py.dyalog'
     
@@ -58,9 +67,13 @@ def win_dythread(dyalog, cygwin=False):
         
     path=to_bytes(os.path.dirname(SCRIPTFILE))+b'/WinPySlave.dyapp'
     if cygwin: path=cyg_convert_path(path, b"--windows") 
-    Popen([dyalog, b'DYAPP='+path], 
-          startupinfo=startupinfo,
-          preexec_fn=preexec_fn).communicate()
+    
+    dyalog = pystr(dyalog)
+    arg = pystr(b'DYAPP=' + path)
+    
+    x=Popen([dyalog, arg], startupinfo=startupinfo,
+          preexec_fn=preexec_fn)
+    x.communicate()
     
 def cygwin_find_dyalog():
     # the horrible bastard child of two operating systems
@@ -93,18 +106,19 @@ def cygwin_find_dyalog():
             
 def windows_find_dyalog():
     # find the Dyalog path in the registry
-    import _winreg 
+    try: import winreg 
+    except: import _winreg as winreg 
     
     try:
-        key = _winreg.OpenKey(_winreg.HKEY_CURRENT_USER, br'Software\Dyalog')
-        r=b''; i=0
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, pystr(br'Software\Dyalog'))
+        r=pystr(b''); i=0
         while True:
-            r=_winreg.EnumKey(key,i)
-            if b"Dyalog" in r and b"unicode" in r.lower(): break 
+            r=winreg.EnumKey(key,i)
+            if pystr(b"Dyalog") in r and pystr(b"unicode") in r.lower(): break 
             i+=1
-        key = _winreg.OpenKey(key, r)
-        dir, _ = _winreg.QueryValueEx(key, b"dyalog")
-        return dir + br'\dyalog.exe'
+        key = winreg.OpenKey(key, r)
+        dir, _ = winreg.QueryValueEx(key, pystr(b"dyalog"))
+        return to_bytes(dir) + br'\dyalog.exe'
     except WindowsError:
         raise RuntimeError("Dyalog not found.")
     
