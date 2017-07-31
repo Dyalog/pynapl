@@ -277,7 +277,7 @@
 
         ∇ path←FindPythonInRegistry majorVersion;rk;rka;rkb;comp;ver
             :Access Public Shared   
-            
+
             ⍝ attempt to find Python in the registry
             ⍝ (see: https://www.python.org/dev/peps/pep-0514/)
 
@@ -394,7 +394,7 @@
         ⍝ to connect to an external APLBridgeSlave.py rather than launch
         ⍝ one.
         :Field Private debugConnect←0
-        
+
         ⍝ Major version of Python to use. Default: 2
         ⍝ This only really matters for which interpreter to launch,
         ⍝ the APL side of the code does not (currently) care about the
@@ -848,9 +848,24 @@
         ∇
 
         ⍝ evaluate Python code w/arguments
-        ∇ ret←expr Eval args;msg;mtype;recv;nargs
+        ∇ ret←{expr} Eval args;msg;mtype;recv;nargs
             :Access Public
 
+            ⍝ support both the " python Eval args " syntax, as the
+            ⍝ "Eval python args" syntax.
+            :If 0=⎕NC'expr'
+                ⍝ only one argument
+                :If 1=≡args
+                    ⍝ argument is simple, assume an expression w/o arguments
+                    ret←args Eval ⍬
+                :Else
+                    ⍝ argument is complex, assume an expression followed by
+                    ⍝ arguments
+                    ret←(⊃args) Eval 1↓args
+                :EndIf
+                :Return
+            :EndIf
+            
             expr←,expr
             args←,args
             msg←serialize(expr args)
@@ -1015,7 +1030,7 @@
                 {}#.DRC.Close connSocket
             :EndIF
 
-            ⍝ we are no longer ready for commands
+            ⍝ we are no longer ready for commands.
             ready←0
         ∇
 
@@ -1026,18 +1041,5 @@
 
 
     :EndClass
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 :EndNamespace
