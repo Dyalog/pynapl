@@ -390,11 +390,13 @@
         ⍝ will be evaluated.
         :Field Private pyaplns←⍬
 
-        ⍝ the debug constructor will set this, so the program will wait
-        ⍝ to connect to an external APLBridgeSlave.py rather than launch
+        ⍝ Wait to connect to an external APLBridgeSlave.py rather than launch
         ⍝ one.
-        :Field Private debugConnect←0
+        :Field Private attachToExistingPython←0
 
+        ⍝ Print debug messages
+        :Field Private debugMsg←0
+        
         ⍝ Major version of Python to use. Default: 2
         ⍝ This only really matters for which interpreter to launch,
         ⍝ the APL side of the code does not (currently) care about the
@@ -499,9 +501,10 @@
                         port←tryPort
                         serverSocket←2⊃rv
 
-                        ⍝ debug output
-                        :If debugConnect
+                        ⍝ announce this so the user knows what to start
+                        :If attachToExistingPython
                             ⎕←'Started server ',serverSocket,' on port ',port
+                            ⎕←'Waiting to connect'
                         :EndIf
 
                         :Return
@@ -520,7 +523,8 @@
                         :Leave
                     :ElseIf rc=100
                         ⍝ Timeout
-                        ⎕←'Timeout, retrying'
+                        ⍞←'.'
+                        ⎕DL÷20 ⍝ "do events" 
                     :Else
                         ⍝ Error
                         ⎕SIGNAL⊂('EN'BROKEN)('Message' (⍕'Socket error' rval))
@@ -947,7 +951,7 @@
             ⍝ start Python
             spath←(os.GetPath #.Py.ScriptPath),filename
 
-            :If ~debugConnect
+            :If ~attachToExistingPython
                 pypath os.StartPython spath srvport majorVersion
             :EndIf
 
@@ -963,7 +967,7 @@
                 →ready←0
             :EndIf
 
-            :If debugConnect
+            :If debugMsg
                 ⎕←'OK! pid=',pid
             :EndIf
 
@@ -989,13 +993,16 @@
             :For (par val) :In param
                 :Select par
                     ⍝ debug parameter
-                :Case'Debug' ⋄ debugConnect←val
+                :Case'Debug' ⋄ debugMsg←attachToExistingPython←1
                     ⍝ pass in the path to the python interpreter explicitly
                 :Case'PyPath' ⋄ pypath←val 
                     ⍝ construct a client instead of a server
                 :Case 'Client' ⋄ clport←val
                     ⍝ set the Python major version
                 :Case 'Version' ⋄ majorVersion←val
+                    ⍝ wait to attach to existing python
+                :Case 'Attach' ⋄ attachToExistingPython←1
+                    
                 :EndSelect
 
             :EndFor
@@ -1021,7 +1028,7 @@
                 ⍝ shut down the server 
                 {}#.DRC.Close serverSocket 
 
-                :If ~debugConnect
+                :If ~attachToExistingPython
                     ⍝ try to kill the process we started, in case it has not properly exited    
                     os.Kill pid      
                 :EndIf
