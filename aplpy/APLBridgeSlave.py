@@ -5,6 +5,8 @@
 
 from __future__ import absolute_import
 from __future__ import division
+from __future__ import unicode_literals
+from __future__ import print_function
 
 import socket
 import sys
@@ -23,7 +25,7 @@ if __name__=="__main__":
     if hasattr(os, 'setpgrp'): os.setpgrp()
     signal.signal(signal.SIGINT, signal.default_int_handler)
 
-    print "Connecting to APL at port %d" % port
+    print("Connecting to APL at port %d" % port)
     
 	# Attempt an IPV6 socket first 
     try:

@@ -8,10 +8,18 @@
 #   TYPE  SIZE (big-endian)  MESSAGE (`size` bytes, expected to be UTF-8 encoded)
 
 from __future__ import absolute_import 
+from __future__ import division
+from __future__ import unicode_literals
+from __future__ import print_function
 
-import socket, os, time, types, signal, select
+import socket, os, time, types, signal, select, sys
 from . import RunDyalog, Interrupt, WinDyalog
 from .Array import *
+
+# in Python 2, set string types to be their Python 3 equivalents
+if sys.version_info.major == 2:
+    bytes, str = str, unicode
+
 
 class APLError(Exception): pass
 class MalformedMessage(Exception): pass
@@ -38,7 +46,7 @@ class Message(object):
         """Initialize a message"""
         self.type = mtype
         self.data = mdata
-        if type(self.data) is unicode: 
+        if type(self.data) is str: 
             self.data = self.data.encode("utf8")
         if len(self.data) > Message.MAX_LEN:
             raise ValueError("message body exceeds maximum length")
@@ -55,7 +63,7 @@ class Message(object):
             b3 = (len(self.data) & 0x00FF0000) >> 16
             b2 = (len(self.data) & 0x0000FF00) >> 8
             b1 = (len(self.data) & 0x000000FF) >> 0
-            writer.write("%c%c%c%c%c%s" % (self.type,b4,b3,b2,b1,self.data))
+            writer.write(b"%c%c%c%c%c%s" % (self.type,b4,b3,b2,b1,self.data))
             writer.flush()
         finally:
             signal.signal(signal.SIGINT, s) 
@@ -170,10 +178,10 @@ class PyEvaluator(object):
 
             # if it's not any 
             ch=self.expr[i]
-            if ch in u'⎕⍞':
+            if ch in '⎕⍞':
                 build.append('args[%d]' % narg)
                 curarg = self.args[[narg]]
-                if ch==u'⎕' and (isinstance(curarg,APLArray) or isinstance(curarg,APLNamespace)):
+                if ch=='⎕' and (isinstance(curarg,APLArray) or isinstance(curarg,APLNamespace)):
                     # this argument should be converted to a suitable Python representation
                     self.pyargs.append(curarg.to_python())
                 else:
@@ -245,13 +253,13 @@ class Connection(object):
             than be converted to a 'suitable' Python representation.
             """
 
-            if not type(aplfn) is unicode:
-                aplfn = unicode(aplfn, "utf-8")
+            if not type(aplfn) is str:
+                aplfn = str(aplfn, "utf-8")
 
             def __fn(*args):
                 if len(args)==0: return self.eval(aplfn, raw=raw)
-                if len(args)==1: return self.eval(u"(%s)⊃∆"%aplfn, args[0], raw=raw)
-                if len(args)==2: return self.eval(u"(⊃∆)(%s)2⊃∆"%aplfn, args[0], args[1], raw=raw)
+                if len(args)==1: return self.eval("(%s)⊃∆"%aplfn, args[0], raw=raw)
+                if len(args)==2: return self.eval("(⊃∆)(%s)2⊃∆"%aplfn, args[0], args[1], raw=raw)
                 return APLError("Function must be niladic, monadic or dyadic.")
 
             # op can use this for an optimization
@@ -270,27 +278,27 @@ class Connection(object):
             and the function is run in APL directly.
             """
 
-            if not type(aplop) is unicode:
-                aplop = unicode(aplop, "utf-8")
+            if not type(aplop) is str:
+                aplop = str(aplop, "utf-8")
 
             def storeArgInWs(arg,nm):
-                wsname = u"___op%d_%s" % (self.ops, nm)
+                wsname = "___op%d_%s" % (self.ops, nm)
 
                 if type(arg) is types.FunctionType \
                 or type(arg) is types.BuiltinFunctionType:
                     # it is a function
                     if hasattr(arg,'__dict__') and 'aplfn' in arg.__dict__:
                         # it is an APL function
-                        self.eval(u"%s ← %s⋄⍬" % (wsname, arg.aplfn))
+                        self.eval("%s ← %s⋄⍬" % (wsname, arg.aplfn))
                     else:
                         # it is a Python function
                         # store it under this name
                         self.__dict__[wsname] = arg
                         # make it available to APL
-                        self.eval(u"%s ← (py.PyFn'APL.%s').Call⋄⍬" % (wsname, wsname))
+                        self.eval("%s ← (py.PyFn'APL.%s').Call⋄⍬" % (wsname, wsname))
                 else:
                     # it is a value
-                    self.eval(u"%s ← ⊃∆⋄⍬" % wsname, arg) 
+                    self.eval("%s ← ⊃∆⋄⍬" % wsname, arg) 
                 return wsname
 
             def __op(aa, ww=None, raw=False):
@@ -299,22 +307,22 @@ class Connection(object):
                 # store the arguments into APL at the time that the operator is defined
                 wsaa = storeArgInWs(aa, "aa")
                
-                aplfn = u"((%s)(%s))" % (wsaa, aplop)
+                aplfn = "((%s)(%s))" % (wsaa, aplop)
 
                 # . / ∘. must be special-cased
-                if aplop in [u".",u"∘."]: aplfn=u'(∘.(%s))' % wsaa
+                if aplop in [".","∘."]: aplfn='(∘.(%s))' % wsaa
 
                 if not ww is None: 
                     wsww = storeArgInWs(ww, "ww")
-                    aplfn = u"((%s)%s(%s))" % (wsaa, aplop, wsww)
+                    aplfn = "((%s)%s(%s))" % (wsaa, aplop, wsww)
                     # again, . / ∘. must be special-cased
-                    if aplop in [u".",u"∘."]: aplfn=u'((%s).(%s))' % (wsaa, wsww)
+                    if aplop in [".","∘."]: aplfn='((%s).(%s))' % (wsaa, wsww)
                 
                 def __fn(*args):
                     # an APL operator can't return a niladic function
                     if len(args)==0: raise APLError("A function derived from an APL operator cannot be niladic.")
-                    if len(args)==1: return self.eval(u"(%s)⊃∆"%aplfn, args[0], raw=raw)
-                    if len(args)==2: return self.eval(u"(⊃∆)(%s)2⊃∆"%aplfn, args[0], args[1], raw=raw)
+                    if len(args)==1: return self.eval("(%s)⊃∆"%aplfn, args[0], raw=raw)
+                    if len(args)==2: return self.eval("(⊃∆)(%s)2⊃∆"%aplfn, args[0], args[1], raw=raw)
                     raise APLError("Function must be monadic or dyadic.")
 
                 __fn.aplfn = aplfn
@@ -360,7 +368,7 @@ class Connection(object):
 
             # implemented using eval 
 
-            if type(code) in (str,unicode):
+            if type(code) in (str,bytes):
                 code = code.split("\n") # luckily APL has no multiline strings
             
             return self.eval("2⎕FIX ∆", *code)
@@ -370,16 +378,16 @@ class Connection(object):
                as an array ∆. If `raw' is set, the result is not converted to a
                Python representation."""
            
-            if not type(aplexpr) is unicode:
+            if not type(aplexpr) is str:
                 # this should be an UTF-8 string
-                aplexpr=unicode(aplexpr, "utf8")
+                aplexpr=str(aplexpr, "utf8")
 
             # normalize (remove superfluous whitespace and newlines, add in ⋄s where
             # necessary)
 
-            aplexpr = u'⋄'.join(x.strip() for x in aplexpr.split(u"\n") if x.strip()) \
-                          .replace(u'{⋄',u'{').replace(u'⋄}',u'}') \
-                          .replace(u'(⋄',u'(').replace(u'⋄)',u')')
+            aplexpr = '⋄'.join(x.strip() for x in aplexpr.split("\n") if x.strip()) \
+                         .replace('{⋄','{').replace('⋄}','}') \
+                         .replace('(⋄','(').replace('⋄)',')')
 
             # print "evaluating: ", aplexpr
 
@@ -408,14 +416,14 @@ class Connection(object):
         srvsock.bind(('localhost', 0))
         _, port = srvsock.getsockname()
 
-        if DEBUG:print "Waiting for connection at %d" % port
+        if DEBUG:print("Waiting for connection at %d" % port)
         srvsock.listen(1)
         
         if not DEBUG: RunDyalog.dystart(port, dyalog=dyalog)
 
         conn, _ = srvsock.accept()
 
-        if DEBUG:print "Waiting for PID..."
+        if DEBUG:print("Waiting for PID...")
         connobj = Connection(conn, signon=False)
 
         # ask for the PID
@@ -425,7 +433,7 @@ class Connection(object):
             raise APLError(pidmsg.data)
         else:
             pid=int(pidmsg.data)
-            if DEBUG:print "Ok! pid=%d" % pid
+            if DEBUG:print("Ok! pid=%d" % pid)
             apl = connobj.apl
             apl.pid = pid
             
@@ -525,7 +533,7 @@ class Connection(object):
                     raise MalformedMessage("First argument must contain code string.")
 
                 code = val[[0]].to_python()
-                if not type(code) in (str,unicode):
+                if not type(code) in (str,bytes):
                     raise MalformedMessage("Code element must be a string, but got: %s" % repr(code))
 
                 # unpack arguments
@@ -544,14 +552,14 @@ class Connection(object):
         elif t==Message.DBGSerializationRoundTrip:
             # this is a debug message. Deserialize the contents, print them to stdout, reserialize and send back
             try:
-                print "Received data: ", message.data
-                print "---------------"
+                print("Received data: ", message.data)
+                print("---------------")
 
                 aplarr = APLArray.fromJSONString(message.data)
                 serialized = aplarr.toJSONString()
 
-                print "Sending back: ", serialized
-                print "---------------"
+                print("Sending back: ", serialized)
+                print("---------------")
 
                 Message(Message.DBGSerializationRoundTrip, serialized).send(self.sockfile)
             except Exception as e:

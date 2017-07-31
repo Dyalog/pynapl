@@ -2,6 +2,7 @@
 
 from __future__ import absolute_import
 from __future__ import division
+from __future__ import unicode_literals
 
 import sys
 import operator
@@ -15,6 +16,11 @@ from .Util import *
 # anymore
 if sys.version_info.major >= 3:
     long = int 
+
+# define (str, bytes) to be their Python 3 types
+if sys.version_info.major == 2:
+    bytes = str
+    str = unicode
 
 # assuming ⎕IO=0 for now
 class APLNamespace(object):
@@ -170,7 +176,7 @@ class APLArray(object):
             return APLArray.from_python(int(obj))
 
         # a one-element string is a character, a multi-element string is a vector
-        elif type(obj) is unicode:
+        elif type(obj) is str:
             if len(obj) == 1:
                 if enclose: return APLArray(rho=[], data=[obj], type_hint=APLArray.TYPE_HINT_CHAR)
                 else: return obj
@@ -179,9 +185,9 @@ class APLArray(object):
                 aplstr.type_hint = APLArray.TYPE_HINT_CHAR
                 return aplstr
 
-        elif type(obj) is str:
+        elif type(obj) is bytes:
             # a non-unicode string will be encoded as UTF-8
-            return APLArray.from_python(unicode(obj, "utf8"))
+            return APLArray.from_python(str(obj, "utf8"))
 
         # if the object is iterable, but not one of the above, try making a list out of it
         if isinstance(obj, collections.Iterable):
@@ -239,7 +245,7 @@ class APLArray(object):
             # we have some data to use
             if isinstance(self.data[0], APLArray):
                 self.type_hint = self.data[0].genTypeHint()
-            elif type(self.data[0]) in (str,unicode):
+            elif type(self.data[0]) in (str,bytes):
                 self.type_hint = APLArray.TYPE_HINT_CHAR
             else:
                 self.type_hint = APLArray.TYPE_HINT_NUM
@@ -262,19 +268,23 @@ class APLArray(object):
         return sum((x-IO)*(y-IO) for x,y in zip(scan_reverse(operator.__mul__,self.rho[1:]+[1]), idx))
 
     def check_valid_idx(self, idx):
+        if type(idx) in (int,long): # if ⍴=1, allow for index to be given as scalar
+            idx = [idx]
+
         if not len(idx)==len(self.rho):
-            raise IndexError("⍴=%d, should be %d"%len(self.rho),len(idx))
+            raise IndexError("⍴=%d, should be %d"%(len(self.rho),len(idx)))
         
         if not all(0 <= ix < sz for (ix,sz) in zip(idx, self.rho)):
             raise IndexError()
 
+        return idx
 
     def __getitem__(self,idx):
-        self.check_valid_idx(idx)
+        idx = self.check_valid_idx(idx)
         return self.data[self.flatten_idx(idx)]
 
     def __setitem__(self,idx,val):
-        self.check_valid_idx(idx)
+        idx = self.check_valid_idx(idx)
         # make sure that if arrays are added, they are converted transparently
         self.data[self.flatten_idx(idx)]=APLArray.from_python(val,enclose=False)
 
