@@ -18,13 +18,13 @@ if sys.version_info.major == 2:
  
 # convert to bytes
 def to_bytes(x):
-    if typeof(x) is str:
+    if type(x) is str:
         return x.encode('utf-8')
     else:
         return x
 
 def from_bytes(x):
-    if typeof(x) is bytes:
+    if type(x) is bytes:
         return str(x, 'utf-8')
     else:
         return x
