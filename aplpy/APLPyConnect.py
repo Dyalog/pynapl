@@ -84,7 +84,16 @@ class Message(object):
             b3 = (len(self.data) & 0x00FF0000) >> 16
             b2 = (len(self.data) & 0x0000FF00) >> 8
             b1 = (len(self.data) & 0x000000FF) >> 0
-            writer.write(b"%c%c%c%c%c%s" % (self.type,b4,b3,b2,b1,self.data))
+            
+            # Python 2 and 3 handle this differently
+            # Annoyingly enough, the newest Python 3 (.6) has added support for this back in,
+            # but we can't expect that version to be present just yet
+            if sys.version_info.major == 2:
+                writer.write(b"%c%c%c%c%c%s" % (self.type,b4,b3,b2,b1,self.data))
+            else:
+                writer.write(bytes([self.type,b4,b3,b2,b1]))
+                writer.write(self.data)
+            
             writer.flush()
         finally:
             if s: signal.signal(signal.SIGINT, s) 
