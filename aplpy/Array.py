@@ -3,12 +3,18 @@
 from __future__ import absolute_import
 from __future__ import division
 
+import sys
 import operator
 import json
 import codecs
 import collections
 
 from .Util import *
+
+# in Python 3, the distinction between "long" and "int" doesn't exist
+# anymore
+if sys.version_info.major >= 3:
+    long = int 
 
 # assuming ⎕IO=0 for now
 class APLNamespace(object):
