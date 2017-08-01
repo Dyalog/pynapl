@@ -35,6 +35,37 @@
         py←⎕NEW Py ('Client' port)
     ∇
 
+    :Section Hand out unique tokens
+        :Class TokenDistributor
+            :Field Private token←0
+            :Field Private Shared TOKEN_POOL_CONSTANT←9950
+            ∇ Init
+                :Access Public
+                :Implements Constructor
+                ⎕TPUT TOKEN_POOL_CONSTANT
+            ∇
+
+            ∇ tok←GetToken
+                :Access Public
+                ⎕TGET TOKEN_POOL_CONSTANT
+                token+←1
+                token+←token=TOKEN_POOL_CONSTANT
+                tok←token
+                ⎕TPUT TOKEN_POOL_CONSTANT
+            ∇
+        :EndClass
+
+        tokenDistributor←⍬
+
+        ∇tok←GetToken
+            :If ⍬≡tokenDistributor
+                tokenDistributor←⎕NEW TokenDistributor
+            :EndIf
+            tok←tokenDistributor.GetToken
+        ∇
+    :EndSection
+
+
     :Class JSONSerializer
 
         ⍝ deserialize
@@ -396,12 +427,23 @@
 
         ⍝ Print debug messages
         :Field Private debugMsg←0
-        
+
         ⍝ Major version of Python to use. Default: 2
         ⍝ This only really matters for which interpreter to launch,
         ⍝ the APL side of the code does not (currently) care about the
         ⍝ difference.
         :Field Private majorVersion←2
+
+        ⍝ Holds expect token number. The async thread will only try to
+        ⍝ receive when this token is available.
+        :Field Private expectToken←⍬
+
+        ⍝ Holds read token number.
+        :Field Private readToken←⍬
+        
+        ⍝ If we have spawned a thread for asynchronous message handling,
+        ⍝ this will hold its ID.
+        :Field Private asyncThread←⍬
 
         ∇ r←GetLastError
             :Access Public
@@ -431,8 +473,7 @@
                     :Access Public
                     sin ← serialize in
 
-                    Msgs.DBGSerializationRoundTrip USend sin
-                    msg sout←Expect Msgs.DBGSerializationRoundTrip
+                    msg sout←{⍵ ExpectAfterSending (⍵ sin)}Msgs.DBGSerializationRoundTrip
 
                     :If msg≠Msgs.DBGSerializationRoundTrip
                         ⎕←'Received other msg: ' msg sout
@@ -469,6 +510,9 @@
             :Field Private curtype←¯1
             :Field Private reading←0
 
+            :Field Private expectDepth←0
+
+
             ⍝ Run a client on a given a port
             ∇ RunClient port;rv;ok;msg;data
 
@@ -483,7 +527,7 @@
 
                     ⍝ handle incoming messages
                     :Repeat
-                        ok msg data←URecv
+                        ok msg data←URecv 0
                         :If ~ok ⋄ :Leave ⋄ :EndIf
                         msg HandleMsg data
                     :Until ~ready
@@ -561,19 +605,41 @@
                 :EndIf
             ∇
 
+            ⍝ Send a message and expect a response
+            ⍝ This is done in one go in order to set expectDepth before the message
+            ⍝ is actually sent. This will prevent the asynchrounous message handler from
+            ⍝ cutting in and stealing the response. 
+            ∇ (type data)←response_type ExpectAfterSending (msgtype msgdata)
+
+                ⎕TGET expectToken
+                expectDepth+←1
+                ⎕TPUT expectToken
+
+                msgtype USend msgdata
+                (type data)←Expect response_type 
+
+                ⎕TGET expectToken
+                expectDepth-←1
+                ⎕TPUT expectToken
+            ∇
+
             ⍝ Expect a message
             ⍝ Returns (type,data) for a message.
             ∇ (type data)←Expect msgtype;ok
                 ⍝ TODO: this will handle incoming messages arising from
                 ⍝ a sent message if applicable
 
+                ⎕TGET expectToken
+                expectDepth+←1
+                ⎕TPUT expectToken
+
                 :Repeat
-                    ok type data←URecv
+                    ok type data←URecv 0
 
                     :If ~ok
                         ready←0
                         ⎕SIGNAL⊂('EN'BROKEN)('Message' 'Connection broken.')
-                        :Return
+                        →out
                     :EndIf
 
                     ⍝ if this is the expected message or an error message,
@@ -594,20 +660,38 @@
                         :EndTrap
                     :EndIf
                 :EndRepeat
+
+                out:
+                ⎕TGET expectToken
+                expectDepth-←1
+                ⎕TPUT expectToken
             ∇
 
             ⍝ Receive Unicode message
-            ∇ (success mtype recv)←URecv;s;m;r
-                s m r←Recv
-                (success mtype recv)←s m ('UTF-8' (⎕UCS⍣s) r)
+            ∇ (success mtype recv)←URecv async;s;m;r
+                s m r←Recv async
+                (success mtype recv)←s m ('UTF-8' (⎕UCS⍣(s>0)) r)
             ∇
 
             ⍝ Receive message. Will also signal Python on interrupt, if the Python is ours
+            ⍝ If async is set, and no message is available, will return ¯1 for the success
+            ⍝ variable instead of waiting for a message.
             ⍝ Message fmt: X L L L L Data
-            ∇ (success mtype recv)←Recv;done;wait_ret;rc;obj;event;sdata;tmp;interrupt;itr_ret;threadState
+            ∇ (success mtype recv)←Recv async;done;wait_ret;rc;obj;event;sdata;tmp;interrupt;itr_ret;threadState
                 'Inactive instance' ⎕SIGNAL BROKEN when ~ready
 
                 interrupt←0
+
+                ⎕TGET expectToken
+                :If (⎕TPUT expectToken)⊢expectDepth>0
+                :AndIf async=1
+                    ⍝ Don't do asynchronous communication if someone is expecting data
+                    (success mtype recv)←¯1 0 ⍬                    
+                    ⎕←'no'
+                    :Return
+                :EndIf
+
+                ⎕TGET readToken
 
                 :Trap 1000
 
@@ -632,8 +716,7 @@
                                 itr_ret←0 ⍝ we can jump out afterwards
                                 →handle_interrupt
                             :EndIf
-
-                            :Return
+                            →out
                         :Else
                             ⍝ we don't currently have enough data for what we need
                             ⍝ (either a message or a header), so we need to read more
@@ -647,7 +730,7 @@
 
                                 ⍝ don't break while in Conga 
                                 threadState←2503⌶1
-                                rc←⊃wait_ret←#.DRC.Wait connSocket
+                                rc←⊃wait_ret←#.DRC.Wait connSocket (100-async×99)
                                 {}2503⌶threadState
 
                                 :If rc=0 ⍝ success
@@ -662,7 +745,13 @@
                                         →error
                                     :EndSelect
                                 :ElseIf rc=100 ⍝ timeout
-                                    {}⎕DL 0.5 ⍝ wait half a second and try again
+                                    :If async
+                                        ⍝ no data available, signal this
+                                        (success mtype recv)←¯1 0 ⍬
+                                        →out
+                                    :Else
+                                        {}⎕DL 0.5 ⍝ wait half a second and try again
+                                    :EndIf
                                 :Else ⍝ not a timeout and not success → error
                                     →error
                                 :EndIf
@@ -701,7 +790,7 @@
                 error:
                 (success mtype recv)←0 ¯1 sdata
                 ready←0
-                :Return
+                →out
 
                 handle_interrupt:
                 interrupt←0
@@ -710,6 +799,9 @@
                     os.Interrupt pid
                 :EndIf
                 →itr_ret
+
+                out:
+                ⎕TPUT readToken
 
             ∇
         :EndSection
@@ -809,11 +901,8 @@
         ∇ str←Repr code;mtype;recv
             :Access Public
 
-            ⍝ send the message
-            Msgs.REPR USend code
-
             ⍝receive message
-            mtype recv←Expect Msgs.REPRRET
+            mtype recv←Msgs.REPRRET ExpectAfterSending (MSG.REPR code)
 
             :If mtype≠Msgs.REPRRET
                 ⎕←'Received non-repr message: ' mtype recv
@@ -861,22 +950,21 @@
                 ⍝ only one argument
                 :If 1=≡args
                     ⍝ argument is simple, assume an expression w/o arguments
-                    ret←args Eval ⍬
+                    expr←args
+                    args←⍬
                 :Else
                     ⍝ argument is complex, assume an expression followed by
                     ⍝ arguments
-                    ret←(⊃args) Eval 1↓args
+                    expr←⊃args
+                    args←1↓args
                 :EndIf
-                :Return
             :EndIf
-            
+
             expr←,expr
             args←,args
             msg←serialize(expr args)
 
-            Msgs.EVAL USend msg
-
-            mtype recv←Expect Msgs.EVALRET
+            mtype recv←Msgs.EVALRET ExpectAfterSending (Msgs.EVAL msg)
 
             :If mtype=Msgs.EVALRET
                 ret←deserialize recv
@@ -897,9 +985,8 @@
         ⍝ execute Python code
         ∇ Exec code;mtype;recv
             :Access Public
-            Msgs.EXEC USend code
 
-            mtype recv←Expect Msgs.OK
+            mtype recv←Msgs.OK ExpectAfterSending (Msgs.EXEC code)
 
             :If mtype=Msgs.OK
                 :Return
@@ -917,6 +1004,10 @@
         ∇ InitCommon
             reading←0 ⋄ curlen←¯1 ⋄ curdata←'' ⋄ curtype←¯1
             pyaplns←⎕NS''
+            expectToken←#.Py.GetToken
+            ⎕TPUT expectToken
+            readToken←#.Py.GetToken
+            ⎕TPUT readToken
 
             ⍝ check OS
             :If ∨/'Windows'⍷⊃#.⎕WG'APLVersion'
@@ -970,6 +1061,11 @@
             :If debugMsg
                 ⎕←'OK! pid=',pid
             :EndIf
+            
+            :If attachToExistingPython
+                ⍝ run the asynchronous thread
+                asyncThread←{AsyncThread}&⍬
+            :EndIf
 
         ∇
 
@@ -1002,7 +1098,7 @@
                 :Case 'Version' ⋄ majorVersion←val
                     ⍝ wait to attach to existing python
                 :Case 'Attach' ⋄ attachToExistingPython←1
-                    
+
                 :EndSelect
 
             :EndFor
@@ -1032,6 +1128,11 @@
                     ⍝ try to kill the process we started, in case it has not properly exited    
                     os.Kill pid      
                 :EndIf
+                
+                :If ⍬≢asyncThread
+                    ⍝ we have started an asynchronous thread, so kill it if it is still running
+                    ⎕TKILL asyncThread
+                :EndIf
             :Else
                 ⍝ close the client socket
                 {}#.DRC.Close connSocket
@@ -1044,6 +1145,23 @@
         ∇ destruct
             :Implements Destructor
             Stop
+        ∇
+
+        ⍝ Asynchronous message handler. This is used if you want to have
+        ⍝ a connection between two interactive REPLs.
+        ∇ AsyncThread;succ;msg;recv
+            :Access Private Instance
+            :While ready
+                ⎕TGET expectToken
+                :If (⎕TPUT expectToken)⊢expectDepth=0
+                    (succ msg recv)←URecv 1
+
+                    :If succ=1
+                        msg HandleMsg recv
+                    :EndIf
+                :EndIf
+                {}⎕DL÷4
+            :EndWhile
         ∇
 
 

@@ -76,7 +76,7 @@ class Message(object):
         # the error claims SIG_IGN isn't a valid signal
         try:
             s = signal.signal(signal.SIGINT, signal.SIG_IGN)
-        except TypeError:
+        except (TypeError, ValueError):
             pass
 
         try:
@@ -99,8 +99,12 @@ class Message(object):
             if s: signal.signal(signal.SIGINT, s) 
 
     @staticmethod
-    def recv(reader,socket):
-        """Read a message from a reader."""
+    def recv(reader,socket,block=True):
+        """Read a message from a reader.
+        
+        If block is set to False, then it will return None if no message is
+        available, rather than wait until one comes in.
+        """
 
         # unfortunately, we have to pass the socket in separately, as Python 3
         # no longer allows using select.select on a socket file
@@ -109,16 +113,24 @@ class Message(object):
         setsgn = False
         
         try:
-            # wait for message available
-            while True:
+            if block:
+                # wait for message available
+                while True:
+                    ready = select.select([socket], [], [], 0.1)
+                    if ready[0]: break
+            else:
+                # if no message available, return None
                 ready = select.select([socket], [], [], 0.1)
-                if ready[0]: break
-            
+                if not ready[0]: return None
+
             # read the header
             try:
                 mtype = maybe_ord(reader.read(1))
                 # once we've started reading, finish reading: turn off the interrupt handler
-                setsgn, s = True, signal.signal(signal.SIGINT, signal.SIG_IGN)
+                try:
+                    setsgn, s = True, signal.signal(signal.SIGINT, signal.SIG_IGN)
+                except ValueError:
+                    pass # we're not on the main thread, so no signaling at all
 
                 lfield = list(map(maybe_ord, reader.read(4)))
                 length = (lfield[0]<<24) + (lfield[1]<<16) + (lfield[2]<<8) + lfield[3]
@@ -380,11 +392,28 @@ class Connection(object):
         if signon:
             Message(Message.PID, str(os.getpid())).send(self.sockfile)
 
-    def runUntilStop(self):
-        """Receive messages and respond to them until STOP is received"""
+    def runUntilStop(self, asyncHandler=None):
+        """Receive messages and respond to them until STOP is received.
+        Optionally, also send messages and process them if asyncHandler
+        is set.
+        """
         self.stop = False
+        
+        if not asyncHandler is None:
+            asyncHandler._setAPL(self.apl)
+
         while not self.stop:
-            self.respond(Message.recv(self.sockfile,self.socket))
+            # is there a message available?
+            msg = Message.recv(self.sockfile, self.socket, block=False)
+
+            if not msg is None:
+                # yes, respond to it
+                self.respond(msg)
+                #self.respond(Message.recv(self.sockfile,self.socket))
+
+            # if we have an asyncHandler, process its messages
+            if not asyncHandler is None:
+                asyncHandler._process()
 
     def expect(self, msgtype):
         """Expect a certain type of message. If such a message or an error
