@@ -245,7 +245,7 @@
                 :EndTrap
             :endif
             arg←('⍎'⎕R program)('⍠'⎕R(⍕srvport))argfmt
-            ⎕SH ⎕←pypath,' ',arg,' >/dev/null &'
+            ⎕SH pypath,' ',arg,' >/dev/null &'
 
         ∇
 
