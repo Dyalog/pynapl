@@ -244,7 +244,7 @@
                     ⎕SIGNAL⊂('EN'999)('Message' 'Cannot find Python on the path.')
                 :EndTrap
             :endif
-            arg←('⍎'⎕R program)('⍠'⎕R(⍕srvport))argfmt
+            arg←('⍎'⎕R{program})('⍠'⎕R{⍕srvport})argfmt
             ⎕SH pypath,' ',arg,' >/dev/null &'
 
         ∇
@@ -282,32 +282,39 @@
             r←(⌽∨\⌽'\'=fname)/fname
         ∇
 
-        ∇ {py} StartPython (argfmt program srvport majorVersion);pypath;arg
-            :Access Public Instance
+        ∇ {py} StartPython (argfmt program srvport majorVersion);pypath;arg;nonstandard
+            :Access Public Instance                                                    
+            nonstandard←0
             :If 0=≢argfmt
                 ⍝ Use default argument format: <program> <port>
                 argfmt←'"⍎" ⍠'
+            :Else
+                nonstandard←1
             :EndIf
             
             :If 2=⎕NC'py' 
             :andIf 0≠≢py
                 ⍝ use given path
-                pypath←py
+                pypath←py     
+                nonstandard←1
             :ElseIf 0=≢pypath←FindPythonInRegistry majorVersion
                 ⍝ can't find it in registry either
                 ⎕SIGNAL⊂('EN'999)('Message' 'Cannot find Python in registry.')
             :EndIf
 
-            arg←('⍎'⎕R program)('⍠'⎕R(⍕srvport))argfmt
+            arg←('⍎'⎕R{program})('⍠'⎕R{⍕srvport})argfmt
             :Trap 90  
 
                 pyProcess←⎕NEW Process
                 pyProcess.StartInfo.FileName←pypath
                 pyProcess.StartInfo.Arguments←arg  
-                pyProcess.StartInfo.RedirectStandardOutput←1
-                pyProcess.StartInfo.RedirectStandardError←1 
-                pyProcess.StartInfo.UseShellExecute←0
-                pyProcess.StartInfo.CreateNoWindow←1  
+                :If ~nonstandard
+                    ⍝ this will crash e.g. Blender, so only do it to known Python
+                    pyProcess.StartInfo.RedirectStandardOutput←1
+                    pyProcess.StartInfo.RedirectStandardError←1 
+                    pyProcess.StartInfo.UseShellExecute←0
+                    pyProcess.StartInfo.CreateNoWindow←1
+                :EndIf  
                 {}pyProcess.Start ⍬
             :Else
                 ⎕SIGNAL⊂('EN'999)('Message' 'Cannot start Python')
@@ -372,7 +379,7 @@
             ⍝ the rest of the program will pass a PID in for both OSes,
             ⍝ in Windows we don't need it, so we ignore it.
             :Access Public Instance  
-            :Trap 90
+            :Trap 6 90
                 ⍝ The process is supposed to exit on its own, so there's a good chance
                 ⍝ this will give an exception, thus the trap.
                 pyProcess.Kill ⍬                             
