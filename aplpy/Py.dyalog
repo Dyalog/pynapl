@@ -1033,7 +1033,7 @@
         ∇
 
         ⍝ Initialization routine
-        ∇ InitServer;ok;tries;code;clt;success;_;msg;srvport;piducs;spath
+        ∇ InitServer startAsync;ok;tries;code;clt;success;_;msg;srvport;piducs;spath
             InitCommon
 
             ⍝ Attempt to start a server
@@ -1062,7 +1062,7 @@
                 ⎕←'OK! pid=',pid
             :EndIf
             
-            :If attachToExistingPython
+            :If startAsync
                 ⍝ run the asynchronous thread
                 asyncThread←{AsyncThread}&⍬
             :EndIf
@@ -1073,12 +1073,12 @@
             :Access Public Instance
             :Implements Constructor
 
-            InitServer
+            InitServer 0
         ∇
 
         ⍝ param constructor 
         ⍝ this takes a (param value) vector of vectors
-        ∇ paramConstruct param;dC;par;val;clport
+        ∇ paramConstruct param;dC;par;val;clport;startAsync
             :Access Public Instance
             :Implements Constructor
 
@@ -1098,13 +1098,14 @@
                 :Case 'Version' ⋄ majorVersion←val
                     ⍝ wait to attach to existing python
                 :Case 'Attach' ⋄ attachToExistingPython←1
-
+                    ⍝ start the asynchronous thread
+                :Case 'StartAsyncThread' ⋄ startAsync←val
                 :EndSelect
 
             :EndFor
 
             :If 0=clport
-                InitServer
+                InitServer startAsync
             :Else
                 InitClient clport
             :EndIf
