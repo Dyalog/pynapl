@@ -225,8 +225,13 @@
             r←(⌽∨\⌽'/'=fname)/fname
         ∇
 
-        ∇ {py} StartPython (program srvport majorVersion);cmd;pypath
+        ∇ {py} StartPython (argfmt program srvport majorVersion);cmd;pypath;arg
             :Access Public Shared
+            :If 0=≢argfmt
+                ⍝ Use default argument format: <program> <port>
+                argfmt←'''⍎'' ⍠'
+            :EndIf
+            
             :If 2=⎕NC'py'
             :andif 0≠≢py
                 ⍝use given path
@@ -239,7 +244,8 @@
                     ⎕SIGNAL⊂('EN'999)('Message' 'Cannot find Python on the path.')
                 :EndTrap
             :endif
-            ⎕SH pypath,' ',program,' ',(⍕srvport),' >/dev/null &'
+            arg←('⍎'⎕R program)('⍠'⎕R(⍕srvport))argfmt
+            ⎕SH ⎕←pypath,' ',arg,' >/dev/null &'
 
         ∇
 
@@ -276,11 +282,13 @@
             r←(⌽∨\⌽'\'=fname)/fname
         ∇
 
-        ∇ {py} StartPython (program srvport majorVersion);pypath
+        ∇ {py} StartPython (argfmt program srvport majorVersion);pypath;arg
             :Access Public Instance
-            ⍝⎕USING←'System.Diagnostics,System.dll'
-            ⍝⎕USING,←⊂'Microsoft.Win32,mscorlib.dll' 
-
+            :If 0=≢argfmt
+                ⍝ Use default argument format: <program> <port>
+                argfmt←'"⍎" ⍠'
+            :EndIf
+            
             :If 2=⎕NC'py' 
             :andIf 0≠≢py
                 ⍝ use given path
@@ -290,12 +298,12 @@
                 ⎕SIGNAL⊂('EN'999)('Message' 'Cannot find Python in registry.')
             :EndIf
 
-
+            arg←('⍎'⎕R program)('⍠'⎕R(⍕srvport))argfmt
             :Trap 90  
 
                 pyProcess←⎕NEW Process
                 pyProcess.StartInfo.FileName←pypath
-                pyProcess.StartInfo.Arguments←program,' ',⍕srvport  
+                pyProcess.StartInfo.Arguments←arg  
                 pyProcess.StartInfo.RedirectStandardOutput←1
                 pyProcess.StartInfo.RedirectStandardError←1 
                 pyProcess.StartInfo.UseShellExecute←0
@@ -440,7 +448,7 @@
 
         ⍝ Holds read token number.
         :Field Private readToken←⍬
-        
+
         ⍝ If we have spawned a thread for asynchronous message handling,
         ⍝ this will hold its ID.
         :Field Private asyncThread←⍬
@@ -1033,7 +1041,7 @@
         ∇
 
         ⍝ Initialization routine
-        ∇ InitServer startAsync;ok;tries;code;clt;success;_;msg;srvport;piducs;spath
+        ∇ InitServer (startAsync argfmt);ok;tries;code;clt;success;_;msg;srvport;piducs;spath
             InitCommon
 
             ⍝ Attempt to start a server
@@ -1043,7 +1051,7 @@
             spath←(os.GetPath #.Py.ScriptPath),filename
 
             :If ~attachToExistingPython
-                pypath os.StartPython spath srvport majorVersion
+                pypath os.StartPython argfmt spath srvport majorVersion
             :EndIf
 
             ready←1
@@ -1061,7 +1069,7 @@
             :If debugMsg
                 ⎕←'OK! pid=',pid
             :EndIf
-            
+
             :If startAsync
                 ⍝ run the asynchronous thread
                 asyncThread←{AsyncThread}&⍬
@@ -1073,18 +1081,20 @@
             :Access Public Instance
             :Implements Constructor
 
-            InitServer 0
+            InitServer 0 ''
         ∇
 
         ⍝ param constructor 
         ⍝ this takes a (param value) vector of vectors
-        ∇ paramConstruct param;dC;par;val;clport;startAsync
+        ∇ paramConstruct param;dC;par;val;clport;startAsync;argfmt
             :Access Public Instance
             :Implements Constructor
 
             ⍝ if only one parameter, enclose the vector
             param←⊂⍣(2=|≡param)⊢param
 
+            argfmt←''
+            startAsync←0
             clport←0
             :For (par val) :In param
                 :Select par
@@ -1092,6 +1102,8 @@
                 :Case'Debug' ⋄ debugMsg←attachToExistingPython←1
                     ⍝ pass in the path to the python interpreter explicitly
                 :Case'PyPath' ⋄ pypath←val 
+                    ⍝ pass in a different argument format if necessary
+                :Case 'ArgFmt' ⋄ argfmt←val
                     ⍝ construct a client instead of a server
                 :Case 'Client' ⋄ clport←val
                     ⍝ set the Python major version
@@ -1105,7 +1117,7 @@
             :EndFor
 
             :If 0=clport
-                InitServer startAsync
+                InitServer startAsync argfmt
             :Else
                 InitClient clport
             :EndIf
@@ -1129,7 +1141,7 @@
                     ⍝ try to kill the process we started, in case it has not properly exited    
                     os.Kill pid      
                 :EndIf
-                
+
                 :If ⍬≢asyncThread
                     ⍝ we have started an asynchronous thread, so kill it if it is still running
                     ⎕TKILL asyncThread
