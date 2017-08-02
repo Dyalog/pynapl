@@ -34,7 +34,6 @@ def runSlave(port):
 
     conn = C.Connection(sock)
     conn.runUntilStop()
-    sock.close()
     sys.exit(0)
 
 if __name__=="__main__":

@@ -172,14 +172,19 @@ class Connection(object):
             """If the connection was initiated from the Python side, this will close it."""
             if not self.pid is None:
                 # already killed it? (destructor might call this function after the user has called it as well)
-                if self.pid == 0: 
+                if not self.pid:
                     return
-                Message(Message.STOP, "STOP").send(self.conn.sockfile)
+                try: Message(Message.STOP, "STOP").send(self.conn.sockfile)
+                except ValueError: pass # if already closed, don't care
                 # give the APL process half a second to exit cleanly
                 time.sleep(.5)
                 try: os.kill(self.pid, 15) # SIGTERM
                 except OSError: pass # just leak the instance, it will be cleaned up once Python exits
                 self.pid=0
+
+                # the connection is now gone, so close the socket
+                try:self.conn.socket.close()
+                except:pass
             else: 
                 raise ValueError("Connection was not started from the Python end.")
 
@@ -369,6 +374,8 @@ class Connection(object):
         if DEBUG:print("Waiting for PID...")
         connobj = Connection(conn, signon=False)
 
+        srvsock.close()
+
         # ask for the PID
         pidmsg = connobj.expect(Message.PID)
         
@@ -440,7 +447,6 @@ class Connection(object):
             # the Python side was interrupted, and we need to tell the
             # APL this.
             Message(Message.ERR, "Interrupt").send(self.sockfile)
-
 
     def respond_inner(self, message):
         """Respond to a message"""

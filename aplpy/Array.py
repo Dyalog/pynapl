@@ -206,6 +206,17 @@ class APLArray(object):
 
         return APLArray(rho, data, self.genTypeHint())
 
+    def __eq__(self, other):
+        if self.rho != self.rho: return False
+
+        for (x,y) in zip(self.data, other.data):
+            if x != y: return False
+
+        return True
+
+    def __ne__(self, other):
+        return not (self == other)
+
     def split(self, nocopy=False):
         """APL ↓ - used by the conversion method
         
