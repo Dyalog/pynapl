@@ -31,6 +31,20 @@ The resulting object can be used to interact with the Python
 interpreter. Once the object is destroyed, the Python interpreter
 associated with it will also be shut down.
 
+There are several different options that can be given to the Py
+class, namely:
+
+| Option | Argument | Purpose |
+| --- | --- | --- |
+| `Attach` | ignored | Do not start up a Python instance, but allow attachment to one that is already running. A port number will be given, and it will wait for a connection from the Python side. The Python side can be told to connect using `APL.client(port)`. |
+| `PyPath` | path to an interpreter | Start the Python interpreter given in the argument, instead of the system one. |
+| `ArgFmt` | string, where `⍎` will be replaced by the path to the slave script, and `⍠` by the port number | When used in combination with `PyPath`, use a custom argument format rather than the standard one. |
+| `Version` | major Python version (2 or 3) | Start either a Python 2 or 3 interpreter, depending on which is given. The default is currently 2. |
+| `Debug` | boolean | If the boolean is 1, turns on debug messages and also does not start up a Python instance. |
+
+
+
+
 #### Running Python statements
 
 The `Exec` function can be used to run one or more Python
@@ -375,7 +389,7 @@ Python side:
 >>> 2+2
  # this evaluates to 4
  # Python sends to APL: EVALRET 4
-
+http://localhost:8888/notebooks/Untitled4.ipynb?kernel_name=apl
 APL side:
  ⍝ receives EVALRET 4
      2 + 4
