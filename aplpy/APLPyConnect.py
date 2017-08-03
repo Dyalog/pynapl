@@ -34,7 +34,14 @@ def maybe_ord(item):
         return ord(item)
 
 
-class APLError(Exception): pass
+class APLError(Exception): 
+    def __init__(self, message):
+        # if on Python 3 and these are bytes, convert to unicode
+        if sys.version_info.major >= 3 and type(message) is bytes:
+            Exception.__init__(self, str(message, 'utf-8'))
+        else:
+            Exception.__init__(self, message)
+
 class MalformedMessage(Exception): pass
 
 class Message(object):
