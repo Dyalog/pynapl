@@ -310,6 +310,15 @@ is done in APL without calling back into Python.
  * NoneType: empty numeric vector
  * Dictionary: namespace
 
+In addition, any kind of iterable object (objects that are instances
+of `collections.Iterable` or that implement `__iter__`, and objects
+that implement both `__len__` and `__getitem__`) will be iterated over,
+and the results sent as a vector to APL. This allows for most kinds of
+custom container objects to be used. 
+
+_NOTE_: if the object is an infinite generator, it will cause a hang.
+
+
 #### From APL to Python
 
  * Numbers: int, long, or float, depending on which fits best
