@@ -43,6 +43,18 @@ class, namely:
 | `Debug` | boolean | If the boolean is 1, turns on debug messages and also does not start up a Python instance. |
 
 
+In particular, the following might be of interest:
+
+```apl
+py ← ⎕NEW Py.Py('Version' 3) ⍝ use Python 3 instead of 2
+```
+
+```apl
+⍝ start a Blender instance and control that instead of a normal Python
+⍝ (if on Windows, you have to pass in the absolute path to blender.exe instead)
+py ← ⎕NEW Py.Py (('PyPath' 'blender') ('ArgFmt' '-P "⍎" -- ⍠ thread'))
+```
+
 
 
 #### Running Python statements
