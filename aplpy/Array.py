@@ -193,8 +193,22 @@ class APLArray(object):
             return APLArray.from_python(str(obj, "utf8"))
 
         # if the object is iterable, but not one of the above, try making a list out of it
-        if isinstance(obj, collections.Iterable):
+        if isinstance(obj, collections.Iterable) \
+        or hasattr(obj, '__iter__'):
             return APLArray.from_python(list(obj))
+
+        # last ditch resort: if the object implements __len__ and __getitem__,
+        # we can iterate over it and get the objects that way
+        if hasattr(obj, '__len__') and hasattr(obj, '__getitem__'):
+            try:
+                ls = []
+                for idx in range(len(obj)): ls.append(obj[idx])
+                return APLArray.from_python(ls)
+            except:
+                # if an exception occurs while trying this, let's just report that
+                # we don't support it.
+                raise TypeError("type not supported: " + repr(type(obj)))
+
 
         # nothing else is supported for now
         raise TypeError("type not supported: " + repr(type(obj)))
