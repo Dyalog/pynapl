@@ -90,6 +90,9 @@ class APLArray(object):
             elif 'ns' in jsobj:
                 # this is an APL namespace, which can be represented as a dict in Python
                 return APLNamespace(jsobj['ns'])
+            elif 'imag' in jsobj:
+                # this is a complex number
+                return complex(jsobj['real'], jsobj['imag'])
             else:
                 return jsobj
         else:
@@ -167,7 +170,7 @@ class APLArray(object):
                             data=[APLArray.from_python(x,enclose=False) for x in obj])
         
         # numbers can be represented as numbers, enclosed if at the upper level so we always send an 'array'
-        elif type(obj) in (int,long,float): # complex not supported for now
+        elif type(obj) in (int,long,float,complex): 
             if enclose: return APLArray(rho=[], data=[obj], type_hint=APLArray.TYPE_HINT_NUM)
             else: return obj
 
@@ -314,6 +317,8 @@ class ArrayEncoder(json.JSONEncoder):
             return {"r": obj.rho, "d": obj.data, "t":obj.genTypeHint()}
         elif isinstance(obj, APLNamespace):
             return {"ns": obj.dct}
+        elif isinstance(obj, complex):
+            return {"real": obj.real, "imag": obj.imag}
         else:
             return json.JSONEncoder.default(self, obj)
 

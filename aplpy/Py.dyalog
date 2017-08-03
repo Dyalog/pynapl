@@ -88,6 +88,12 @@
                 r←decodeNS obj.ns
                 :Return
             :EndIf
+            
+            :If 0≠⎕NC'obj.imag'
+                ⍝ an encoded complex number
+                r←obj.real+0j1×obj.imag
+                :Return
+            :EndIf
 
             ⍝ if not a simple object or a namespace,
             ⍝ it must then be an array
@@ -158,8 +164,19 @@
             :If 0=≡obj
                 ⍝ The object is simple, return it
 
-                ⍝ if it is a namespace, it needs to be encapsulated
-                r←taboo encapsulate⍣(9=⊃⎕NC'obj')⊢obj
+                :If 9=⊃⎕NC'obj'
+                    ⍝ the object is a namespace, encapsulate it
+                    r←taboo encapsulate obj
+                :ElseIf ⍬≡0↑obj
+                :AndIf 0≠11○obj
+                    ⍝ it is a complex number, which JSON does not support
+                    ⍝ encode it
+                    r←⎕NS''
+                    r.(real imag)←9 11○obj
+                :Else
+                    ⍝ it is a normal number or character
+                    r←obj
+                :EndIf
             :Else
 
                 ⍝ the object is some kind of array,
