@@ -112,6 +112,10 @@ APLPyConnect
      ⍝ round trip
      'APL.eval("2+2")' py.Eval ⍬
 4
+
+     ⍝ alternate syntax when there are no arguments
+     py.Eval 'APL.eval("2+2")' 
+4
 ```
 
 Just as with `Exec`, an `APL` object will be made available to the
