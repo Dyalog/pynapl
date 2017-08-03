@@ -231,7 +231,7 @@
                 ⍝ Use default argument format: <program> <port>
                 argfmt←'''⍎'' ⍠'
             :EndIf
-            
+
             :If 2=⎕NC'py'
             :andif 0≠≢py
                 ⍝use given path
@@ -291,7 +291,7 @@
             :Else
                 nonstandard←1
             :EndIf
-            
+
             :If 2=⎕NC'py' 
             :andIf 0≠≢py
                 ⍝ use given path
@@ -888,8 +888,8 @@
                         pyaplns.∆←args
                         pyaplns.py←⎕THIS 
 
-                        ⍝ send the result back
-                        rslt←pyaplns⍎expr                   
+                        ⍝ send the result back, if no result then []
+                        rslt←pyaplns.{85::⍬ ⋄ 0(85⌶)⍵}expr                   
 
                         Msgs.EVALRET USend serialize rslt
                     :Else
