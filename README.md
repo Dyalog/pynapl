@@ -158,6 +158,12 @@ showPage←(py.PyFn 'webbrowser.open').Call
 showPage 'http://www.dyalog.com'
 ```
 
+#### Error handling
+
+If the Python code raises an exception, the bridge will signal a
+DOMAIN ERROR. `⎕DMX.Message` will contain the string representation
+of the Python exception. 
+
 ### Accessing APL from Python
 
 The `APL.py` module contains a function that will start an APL
@@ -302,6 +308,15 @@ you must first import the APL function using `fn`.
 If an APL operator is applied to an APL function via Python,
 as in the `apl_sumscan` example, this is detected, and the application
 is done in APL without calling back into Python. 
+
+#### Error handling
+
+If a signal is raised by the APL code, an APLError will be raised
+on the Python side. The exception object will contain a `dmx` field,
+which is a dictionary that contains the fields from `⎕DMX`. 
+
+When an interrupt is raised, the message will be `"Interrupt"` and
+`dmx` will be `None`. 
 
 ### Data conversion
 
