@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
         name='APLPy',
-        version='0.0.2.dev6',
+        version='0.0.3.dev1',
         
         description='Python - Dyalog APL bridge',
         long_description="""
@@ -17,7 +17,7 @@ This package allows communication between Python and Dyalog APL.
         license='TODO',
 
         classifiers=[
-            'Development Status :: 2 - Pre-Alpha',
+            'Development Status :: 3 - Alpha',
 
             'Intended Audience :: Developers',
 
