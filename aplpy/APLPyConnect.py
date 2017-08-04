@@ -12,7 +12,7 @@ from __future__ import division
 from __future__ import unicode_literals
 from __future__ import print_function
 
-import socket, os, time, types, signal, select, sys
+import socket, os, time, types, signal, select, sys, json
 from . import RunDyalog, Interrupt, WinDyalog
 from .Array import *
 from .PyEvaluator import PyEvaluator
@@ -35,7 +35,19 @@ def maybe_ord(item):
 
 
 class APLError(Exception): 
-    def __init__(self, message):
+    def __init__(self, message="", jsobj=None):
+        self.dmx = None
+        # if a JSON object is given, use that
+        if not jsobj is None:
+            if type(jsobj) is bytes: jsobj=str(jsobj, 'utf-8')
+            errobj = json.loads(jsobj)
+            message = errobj['Message']
+            if 'DMX' in errobj:
+                self.dmx = errobj['DMX']
+                if 'Message' in self.dmx and self.dmx['Message'].strip():
+                    message += ': ' + self.dmx['Message']
+
+        
         # if on Python 3 and these are bytes, convert to unicode
         if sys.version_info.major >= 3 and type(message) is bytes:
             Exception.__init__(self, str(message, 'utf-8'))
@@ -301,7 +313,7 @@ class Connection(object):
             reply = self.conn.expect(Message.OK)
 
             if reply.type == Message.ERR:
-                raise APLError(str(reply.data,'utf-8'))
+                raise APLError(jsobj=str(reply.data,'utf-8'))
             else:
                 return self.fn(str(reply.data,'utf-8'))
 
@@ -313,7 +325,7 @@ class Connection(object):
             reply = self.conn.expect(Message.REPRRET)
 
             if reply.type == Message.ERR:
-                raise APLError(str(reply.data,'utf-8'))
+                raise APLError(jsobj=str(reply.data,'utf-8'))
             else:
                 return reply.data
 
@@ -352,7 +364,7 @@ class Connection(object):
             reply = self.conn.expect(Message.EVALRET)
 
             if reply.type == Message.ERR:
-                raise APLError(reply.data)
+                raise APLError(jsobj=reply.data)
 
             answer = APLArray.fromJSONString(reply.data)
 

@@ -65,6 +65,19 @@
         ∇
     :EndSection
 
+    ⍝ Make an error object
+    ∇err←DMXErr dmx
+        err←⎕NS''
+        err.Message←dmx.EM
+        err.DMX←dmx
+        err←⎕JSON err
+    ∇
+    
+    ∇err←MSGErr msg
+        err←⎕NS''
+        err.Message←msg
+        err←⎕JSON err
+    ∇
 
     :Class JSONSerializer
 
@@ -88,7 +101,7 @@
                 r←decodeNS obj.ns
                 :Return
             :EndIf
-            
+
             :If 0≠⎕NC'obj.imag'
                 ⍝ an encoded complex number
                 r←obj.real+0j1×obj.imag
@@ -688,7 +701,7 @@
 
                             type HandleMsg data
                         :Else
-                            Msgs.ERR USend 'Interrupt'
+                            Msgs.ERR USend #.Py.MSGErr 'Interrupt'
                         :EndTrap
                     :EndIf
                 :EndRepeat
@@ -863,7 +876,7 @@
                     :Trap 0
                         Msgs.REPRRET USend ⍕pyaplns⍎mdata
                     :Else
-                        Msgs.ERR USend ⍕⎕DMX.(EM Message)
+                        Msgs.ERR USend #.Py.DMXErr ⎕DMX
                     :EndTrap
 
                     ⍝ 'EXEC' message
@@ -878,10 +891,10 @@
                         :If ''≡0↑rslt
                             Msgs.OK USend rslt
                         :Else
-                            Msgs.ERR USend 'Error on line ',⍕rslt
+                            Msgs.ERR USend #.Py.MSGErr 'Error on line ',⍕rslt
                         :EndIf
                     :Else
-                        Msgs.ERR USend ⍕⎕DMX.(EM Message)
+                        Msgs.ERR USend #.Py.DMXErr ⎕DMX
                     :EndTrap
 
 
@@ -893,7 +906,7 @@
 
                         ⍝check message format
                         :If 2≠≢in
-                            Msgs.ERR USend 'Malformed EVAL message'
+                            Msgs.ERR USend #.Py.MSGErr 'Malformed EVAL message'
                             :Return
                         :EndIf
 
@@ -910,7 +923,7 @@
 
                         Msgs.EVALRET USend serialize rslt
                     :Else
-                        Msgs.ERR USend ⍕⎕DMX.(EM Message)
+                        Msgs.ERR USend #.Py.DMXErr ⎕DMX
                     :EndTrap
 
                     ⍝ Debug serialization round trip
@@ -918,7 +931,7 @@
                     :Trap 0
                         mtype USend serialize deserialize mdata
                     :Else
-                        Msgs.ERR USend ⍕⎕DMX.(EM Message)
+                        Msgs.ERR USend #.Py.DMXErr ⎕DMX
                     :EndTrap
 
                 :Else
