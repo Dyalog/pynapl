@@ -72,7 +72,7 @@
         err.DMX←dmx
         err←⎕JSON err
     ∇
-    
+
     ∇err←MSGErr msg
         err←⎕NS''
         err.Message←msg
@@ -208,7 +208,8 @@
 
             :If 0=⎕NC'taboo' ⋄ taboo←⍬ ⋄ :EndIf
 
-            :If obj∊taboo ⋄ r←⍬ ⋄ :EndIf
+            ⍝ Prevent nested loop
+            :If obj∊taboo ⋄ r←⍬ ⋄ :Return ⋄ :EndIf
 
             :If 9≠⎕NC'obj'
                 ⍝ not a namespace, return it unchanged
