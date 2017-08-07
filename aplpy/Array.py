@@ -10,6 +10,12 @@ import json
 import codecs
 import collections
 
+try:
+    import numpy as np
+    NUMPY_SUPPORT = True
+except:
+    NUMPY_SUPPORT = False
+
 from .Util import *
 
 # in Python 3, the distinction between "long" and "int" doesn't exist
@@ -155,6 +161,19 @@ class APLArray(object):
     
         if obj is None:
             return APLArray.from_python([]) #Return the empty list for "None"
+
+        if NUMPY_SUPPORT:
+            # special case this
+            if isinstance(obj, np.matrix):
+                shape = obj.shape
+                rank = len(shape)
+                l = obj.tolist()
+                for i in range(rank-1):
+                    l = sum(l, [])
+                
+                l = [APLArray.from_python(x,False) for x in l]
+                return APLArray(rho=shape, data=l)
+
 
         if isinstance(obj, APLArray) \
         or isinstance(obj, APLNamespace):
