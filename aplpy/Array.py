@@ -164,7 +164,8 @@ class APLArray(object):
 
         if NUMPY_SUPPORT:
             # special case this
-            if isinstance(obj, np.matrix):
+            if isinstance(obj, np.matrix)\
+            or isinstance(obj, np.ndarray):
                 shape = obj.shape
                 rank = len(shape)
                 l = obj.tolist()
