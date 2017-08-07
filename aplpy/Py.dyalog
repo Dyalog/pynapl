@@ -495,13 +495,13 @@
             :Access Public
             r←lastError
         ∇
-        
+
         ⍝tget/tput wrappers that skip if asyncThread not running
         ⍝ (for performance)
         ∇ {r}←TGETW tok
             r←⍬ ⋄ →(asyncThread≡⍬)/0 ⋄ r←⎕TGET tok
         ∇
-        
+
         ∇ {r}←TPUTW tok
             r←⍬ ⋄ →(asyncThread≡⍬)/0 ⋄ r←⎕TPUT tok
         ∇
@@ -786,7 +786,7 @@
 
                                 ⍝ don't break while in Conga 
                                 threadState←2503⌶1
-                                rc←⊃wait_ret←#.DRC.Wait connSocket (100-async×99)
+                                rc←⊃wait_ret←#.DRC.Wait connSocket 
                                 {}2503⌶threadState
 
                                 :If rc=0 ⍝ success

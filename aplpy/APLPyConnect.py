@@ -181,6 +181,7 @@ class Connection(object):
 
     class APL(object):
         pid=None
+        DEBUG=False
 
         """Represents the APL interpreter."""
         def __init__(self, conn):
@@ -197,8 +198,11 @@ class Connection(object):
                 except ValueError: pass # if already closed, don't care
                 # give the APL process half a second to exit cleanly
                 time.sleep(.5)
-                try: os.kill(self.pid, 15) # SIGTERM
-                except OSError: pass # just leak the instance, it will be cleaned up once Python exits
+                
+                if not self.DEBUG:
+                    try: os.kill(self.pid, 15) # SIGTERM
+                    except OSError: pass # just leak the instance, it will be cleaned up once Python exits
+                
                 self.pid=0
 
                 # the connection is now gone, so close the socket
@@ -405,6 +409,7 @@ class Connection(object):
             if DEBUG:print("Ok! pid=%d" % pid)
             apl = connobj.apl
             apl.pid = pid
+            apl.DEBUG=DEBUG
             
             # if we are on Windows, hide the window
             if os.name=='nt': WinDyalog.hide(pid)
