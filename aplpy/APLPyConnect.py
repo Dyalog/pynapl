@@ -40,7 +40,6 @@ class APLError(Exception):
         # if a JSON object is given, use that
         if not jsobj is None:
             if type(jsobj) is bytes: jsobj=str(jsobj, 'utf-8')
-            print(" --- raw JSON: ",jsobj)
             errobj = json.loads(jsobj)
             message = errobj['Message']
             if 'DMX' in errobj:
