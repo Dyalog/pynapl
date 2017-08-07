@@ -495,6 +495,16 @@
             :Access Public
             r←lastError
         ∇
+        
+        ⍝tget/tput wrappers that skip if asyncThread not running
+        ⍝ (for performance)
+        ∇ {r}←TGETW tok
+            r←⍬ ⋄ →(asyncThread≡⍬)/0 ⋄ r←⎕TGET tok
+        ∇
+        
+        ∇ {r}←TPUTW tok
+            r←⍬ ⋄ →(asyncThread≡⍬)/0 ⋄ r←⎕TPUT tok
+        ∇
 
         ⍝ JSON serialization/deserialization
         :Section JSON serialization/deserialization
@@ -657,16 +667,16 @@
             ⍝ cutting in and stealing the response. 
             ∇ (type data)←response_type ExpectAfterSending (msgtype msgdata)
 
-                ⎕TGET expectToken
+                TGETW expectToken
                 expectDepth+←1
-                ⎕TPUT expectToken
+                TPUTW expectToken
 
                 msgtype USend msgdata
                 (type data)←Expect response_type 
 
-                ⎕TGET expectToken
+                TGETW expectToken
                 expectDepth-←1
-                ⎕TPUT expectToken
+                TPUTW expectToken
             ∇
 
             ⍝ Expect a message
@@ -675,9 +685,9 @@
                 ⍝ TODO: this will handle incoming messages arising from
                 ⍝ a sent message if applicable
 
-                ⎕TGET expectToken
+                TGETW expectToken
                 expectDepth+←1
-                ⎕TPUT expectToken
+                TPUTW expectToken
 
                 :Repeat
                     ok type data←URecv 0
@@ -708,9 +718,9 @@
                 :EndRepeat
 
                 out:
-                ⎕TGET expectToken
+                TGETW expectToken
                 expectDepth-←1
-                ⎕TPUT expectToken
+                TPUTW expectToken
             ∇
 
             ⍝ Receive Unicode message
@@ -728,8 +738,8 @@
 
                 interrupt←0
 
-                ⎕TGET expectToken
-                :If (⎕TPUT expectToken)⊢expectDepth>0
+                TGETW expectToken
+                :If (TPUTW expectToken)⊢expectDepth>0
                 :AndIf async=1
                     ⍝ Don't do asynchronous communication if someone is expecting data
                     (success mtype recv)←¯1 0 ⍬                    
@@ -737,7 +747,7 @@
                     :Return
                 :EndIf
 
-                ⎕TGET readToken
+                TGETW readToken
 
                 :Trap 1000
 
@@ -847,7 +857,7 @@
                 →itr_ret
 
                 out:
-                ⎕TPUT readToken
+                TPUTW readToken
 
             ∇
         :EndSection
