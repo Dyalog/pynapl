@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
         name='APLPy',
-        version='0.0.3.dev3',
+        version='0.0.3.dev4',
         
         description='Python - Dyalog APL bridge',
         long_description="""
