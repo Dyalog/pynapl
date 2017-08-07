@@ -1046,6 +1046,23 @@
             ('Unexpected: ',⍕mtype recv)⎕SIGNAL BUGERR
         ∇
 
+        ⍝ Assign a value to a Python variable
+        ∇ var Set val;r
+            :Access Public
+            r←?1e10
+            {}'globals().update({"__temp"+str(⎕):⎕})' Eval r val
+            Exec var,'=__temp',⍕r
+        ∇ 
+
+        ⍝ Assign a value to a variable (raw)
+        ∇ var SetRaw val;r
+            :Access Public
+
+            r←?1e10
+            {}'globals().update({"__temp"+str(⎕):⍞})' Eval r val
+            Exec var,'=__temp',⍕r
+        ∇
+
         ⍝ Initialization common to the server and the client
         ∇ InitCommon
             reading←0 ⋄ curlen←¯1 ⋄ curdata←'' ⋄ curtype←¯1
