@@ -940,7 +940,7 @@
                 :EndSelect
 
             :Else
-                Msgs.ERR USend 'Interrupt'
+                Msgs.ERR USend #.Py.MSGErr 'Interrupt'
             :EndTrap 
         ∇
         ⍝ debug function (eval/repr)
