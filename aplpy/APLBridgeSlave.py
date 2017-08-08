@@ -19,6 +19,7 @@ mypath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.insert(1,mypath)
 
 from aplpy import APLPyConnect as C
+from aplpy import IPC
 
 def runSlave(inp,outp):
     print("Opening input file...")
@@ -26,8 +27,14 @@ def runSlave(inp,outp):
     # Open the input first, then the output. APL does it in the same order
     # (i.e., it opens its output first, which is Python's input). If it is
     # done the other way around, it will block.
-    inp = open(inp, 'rb')
-    outp = open(outp, 'wb')
+    inp = IPC.FIFO(inp)
+    inp.openRead()
+
+    outp = IPC.FIFO(outp)
+    outp.openWrite()
+
+    #inp = open(inp, 'rb')
+    #outp = open(outp, 'wb')
 
     conn = C.Connection(inp,outp)
     conn.runUntilStop()

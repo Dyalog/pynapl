@@ -14,7 +14,7 @@ from __future__ import print_function
 
 import socket, os, time, types, signal, select, sys, json
 import tempfile
-from . import RunDyalog, Interrupt, WinDyalog
+from . import RunDyalog, Interrupt, WinDyalog, IPC
 from .Array import *
 from .PyEvaluator import PyEvaluator
 
@@ -136,22 +136,19 @@ class Message(object):
             if block:
                 # wait for message available
                 while True:
-                    ready = select.select([reader], [], [], 0.1)
-                    if ready[0]: break
+                    #ready = select.select([reader], [], [], 0.1)
+                    #if ready[0]: break
+                    if reader.avail(0.1): break
             else:
                 # if no message available, return None
-                ready = select.select([reader], [], [], 0.1)
-                if not ready[0]: return None
+                if not reader.avail(0.1): return None
+
+                #ready = select.select([reader], [], [], 0.1)
+                #if not ready[0]: return None
 
             # read the header
             try:
                 inp = reader.read(1)
-
-                # this is necessary in Python 2 for some reason
-                
-                if sys.version_info.major==2 and inp=='':
-                    reader.seek(0)
-                    inp = reader.read(1)
 
                 mtype = maybe_ord(inp)
                 # once we've started reading, finish reading: turn off the interrupt handler
@@ -391,25 +388,22 @@ class Connection(object):
         """Start an APL client. This function returns an APL instance."""
         
         # make two named pipes
-        inname = tempfile.mktemp()
-        outname = tempfile.mktemp()
-
-        os.mkfifo(inname, 0o600)
-        os.mkfifo(outname, 0o600)
-   
+        inpipe = IPC.FIFO()
+        outpipe = IPC.FIFO()
+        
         if DEBUG:
-            print("in: ",inname)
-            print("out: ",outname)
+            print("in: ",inpipe.name)
+            print("out: ",outpipe.name)
 
         # start up Dyalog
-        if not DEBUG: RunDyalog.dystart(outname, inname, dyalog=dyalog)
+        if not DEBUG: RunDyalog.dystart(outpipe.name, inpipe.name, dyalog=dyalog)
 
         # start the writer first
-        writer = open(outname, "wb")
-        reader = open(inname, "rb")
+        outpipe.openWrite()
+        inpipe.openRead()
 
         if DEBUG:print("Waiting for PID...")
-        connobj = Connection(reader, writer, signon=False)
+        connobj = Connection(inpipe, outpipe, signon=False)
 
         # ask for the PID
         pidmsg = connobj.expect(Message.PID)
