@@ -19,20 +19,24 @@ mypath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.insert(1,mypath)
 
 from aplpy import APLPyConnect as C
+from aplpy import IPC
 
-def runSlave(port):
-    print("Connecting to APL at port %d" % port)
+def runSlave(inp,outp):
+    print("Opening input file...")
 
-    # Attempt an IPV6 socket first
-    try:
-        sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-        sock.connect(('localhost',port))
-    except:
-        # try an IPV4 socket
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(('localhost',port))
+    # Open the input first, then the output. APL does it in the same order
+    # (i.e., it opens its output first, which is Python's input). If it is
+    # done the other way around, it will block.
+    inp = IPC.FIFO(inp)
+    inp.openRead()
 
-    conn = C.Connection(sock)
+    outp = IPC.FIFO(outp)
+    outp.openWrite()
+
+    #inp = open(inp, 'rb')
+    #outp = open(outp, 'wb')
+
+    conn = C.Connection(inp,outp)
     conn.runUntilStop()
     sys.exit(0)
 
@@ -42,15 +46,16 @@ if __name__=="__main__":
     if '--' in sys.argv:
         sys.argv = sys.argv[sys.argv.index('--'):]
 
-    port = int(sys.argv[1])
+    infile = sys.argv[1]
+    outfile = sys.argv[2]
 
     if hasattr(os, 'setpgrp'): os.setpgrp()
     signal.signal(signal.SIGINT, signal.default_int_handler)
 
     if 'thread' in sys.argv:
         # run in a thread
-        threading.Thread(target=lambda:runSlave(port)).start()
+        threading.Thread(target=lambda:runSlave(infile,outfile)).start()
     else:
         # run normally
-        runSlave(port)
+        runSlave(infile,outfile)
 

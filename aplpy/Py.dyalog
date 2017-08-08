@@ -1,4 +1,5 @@
-﻿:Namespace Py
+﻿⍝∇:require =/IPC.dyalog
+:Namespace Py
     ⎕IO ⎕ML←1
 
     :Section Helper functions to include Python code in APL code
@@ -30,40 +31,11 @@
         }⎕THIS
     ∇
 
-    ⍝ Start an APL slave and connect to the server at the given port
-    ∇StartAPLSlave port;py
-        py←⎕NEW Py ('Client' port)
+    ⍝ Start an APL slave and connect to the given input and output pipes
+    ∇StartAPLSlave (inf outf);py
+        
+        py←⎕NEW Py (⊂('Client' (inf outf)))
     ∇
-
-    :Section Hand out unique tokens
-        :Class TokenDistributor
-            :Field Private token←0
-            :Field Private Shared TOKEN_POOL_CONSTANT←9950
-            ∇ Init
-                :Access Public
-                :Implements Constructor
-                ⎕TPUT TOKEN_POOL_CONSTANT
-            ∇
-
-            ∇ tok←GetToken
-                :Access Public
-                ⎕TGET TOKEN_POOL_CONSTANT
-                token+←1
-                token+←token=TOKEN_POOL_CONSTANT
-                tok←token
-                ⎕TPUT TOKEN_POOL_CONSTANT
-            ∇
-        :EndClass
-
-        tokenDistributor←⍬
-
-        ∇tok←GetToken
-            :If ⍬≡tokenDistributor
-                tokenDistributor←⎕NEW TokenDistributor
-            :EndIf
-            tok←tokenDistributor.GetToken
-        ∇
-    :EndSection
 
     ⍝ Make an error object
     ∇err←DMXErr dmx
@@ -256,11 +228,11 @@
             r←(⌽∨\⌽'/'=fname)/fname
         ∇
 
-        ∇ {py} StartPython (argfmt program srvport majorVersion);cmd;pypath;arg
+        ∇ {py} StartPython (argfmt program inf outf majorVersion);cmd;pypath;arg
             :Access Public Shared
             :If 0=≢argfmt
-                ⍝ Use default argument format: <program> <port>
-                argfmt←'''⍎'' ⍠'
+                ⍝ Use default argument format: <program> <in> <out>
+                argfmt←'''⍎'' ''→'' ''←'''
             :EndIf
 
             :If 2=⎕NC'py'
@@ -275,7 +247,7 @@
                     ⎕SIGNAL⊂('EN'999)('Message' 'Cannot find Python on the path.')
                 :EndTrap
             :endif
-            arg←('⍎'⎕R{program})('⍠'⎕R{⍕srvport})argfmt
+            arg←('⍎'⎕R{program})('→'⎕R{inf})('←'⎕R{outf})argfmt
             ⎕SH pypath,' ',arg,' >/dev/null &'
 
         ∇
@@ -491,20 +463,12 @@
         ⍝ this will hold its ID.
         :Field Private asyncThread←⍬
 
-        ∇ r←GetLastError
-            :Access Public
-            r←lastError
-        ∇
+        ⍝ In/Out FIFO
+        :Field Private fifoIn
+        :Field Private fifoOut
 
-        ⍝tget/tput wrappers that skip if asyncThread not running
-        ⍝ (for performance)
-        ∇ {r}←TGETW tok
-            r←⍬ ⋄ →(asyncThread≡⍬)/0 ⋄ r←⎕TGET tok
-        ∇
-
-        ∇ {r}←TPUTW tok
-            r←⍬ ⋄ →(asyncThread≡⍬)/0 ⋄ r←⎕TPUT tok
-        ∇
+        ⍝ This is set to 1 if this is our Python (so we need to signal it)
+        :Field Private signalPython←0
 
         ⍝ JSON serialization/deserialization
         :Section JSON serialization/deserialization
@@ -570,29 +534,30 @@
 
 
             ⍝ Run a client on a given a port
-            ∇ RunClient port;rv;ok;msg;data
+            ∇ RunClient (in out);rv;ok;msg;data
 
-                rv←#.DRC.Clt '' 'localhost' port 'Raw'
-                :If 0=⊃rv
-                    ⍝ connection established
-                    connSocket←2⊃rv
-                    ready←1
+                ⍝ bind the sockets
+                fifoIn ← ⎕NEW #.IPC.Unix.FIFO in
+                fifoOut ← ⎕NEW #.IPC.Unix.FIFO out
 
-                    ⍝ send out the PID message
-                    Msgs.PID USend ⍕os.GetPID
+                ⍝ start reading
+                fifoIn.OpenRead
+                fifoOut.OpenWrite
 
-                    ⍝ handle incoming messages
-                    :Repeat
-                        ok msg data←URecv 0
-                        :If ~ok ⋄ :Leave ⋄ :EndIf
-                        msg HandleMsg data
-                    :Until ~ready
-                :Else
-                    ⎕←rv
-                    'Connection to Python server failed.'⎕SIGNAL BROKEN
-                :EndIf
+                ⍝ connection established
+                ready←1
 
+                ⍝ send out the PID message
+                Msgs.PID USend ⍕os.GetPID
+
+                ⍝ handle incoming messages
+                :Repeat
+                    ok msg data←URecv 0
+                    :If ~ok ⋄ :Leave ⋄ :EndIf
+                    msg HandleMsg data
+                :Until ~ready
             ∇
+
             ⍝ Find an open port and start a server on it
             ∇ port←StartServer;tryPort;rv
                 :For tryPort :In ⌽⍳50000 ⍝ 65535
@@ -612,25 +577,6 @@
                 :EndFor
 
                 ⎕SIGNAL⊂('EN'BROKEN)('Message' 'Failed to start server')
-            ∇
-
-            ⍝ Wait for connection, set connSocket if connected
-            ∇ AcceptConnection;rc;rval
-                :Repeat
-                    rc←⊃rval←#.DRC.Wait serverSocket
-                    :If rc=0
-                        connSocket←2⊃rval
-                        :Leave
-                    :ElseIf rc=100
-                        ⍝ Timeout
-                        ⍞←'.'
-                        ⎕DL÷20 ⍝ "do events" 
-                    :Else
-                        ⍝ Error
-                        ⎕SIGNAL⊂('EN'BROKEN)('Message' (⍕'Socket error' rval))
-                        :Leave
-                    :EndIf            
-                :EndRepeat
             ∇
 
             ⍝ Send Unicode message
@@ -655,28 +601,13 @@
 
                 sizefield←(4/256)⊤≢data
                 ⍝ send the message
-                rc←#.DRC.Send connSocket (mtype,sizefield,data)
-                :If 0≠⊃rc
-                    ('Socket error ',⍕rc) ⎕SIGNAL BROKEN
-                :EndIf
+                fifoOut.Write (mtype,sizefield,data)
             ∇
 
             ⍝ Send a message and expect a response
-            ⍝ This is done in one go in order to set expectDepth before the message
-            ⍝ is actually sent. This will prevent the asynchrounous message handler from
-            ⍝ cutting in and stealing the response. 
             ∇ (type data)←response_type ExpectAfterSending (msgtype msgdata)
-
-                TGETW expectToken
-                expectDepth+←1
-                TPUTW expectToken
-
                 msgtype USend msgdata
                 (type data)←Expect response_type 
-
-                TGETW expectToken
-                expectDepth-←1
-                TPUTW expectToken
             ∇
 
             ⍝ Expect a message
@@ -684,11 +615,6 @@
             ∇ (type data)←Expect msgtype;ok
                 ⍝ TODO: this will handle incoming messages arising from
                 ⍝ a sent message if applicable
-
-                TGETW expectToken
-                expectDepth+←1
-                TPUTW expectToken
-
                 :Repeat
                     ok type data←URecv 0
 
@@ -716,11 +642,8 @@
                         :EndTrap
                     :EndIf
                 :EndRepeat
-
                 out:
-                TGETW expectToken
-                expectDepth-←1
-                TPUTW expectToken
+
             ∇
 
             ⍝ Receive Unicode message
@@ -733,131 +656,37 @@
             ⍝ If async is set, and no message is available, will return ¯1 for the success
             ⍝ variable instead of waiting for a message.
             ⍝ Message fmt: X L L L L Data
-            ∇ (success mtype recv)←Recv async;done;wait_ret;rc;obj;event;sdata;tmp;interrupt;itr_ret;threadState
+            ∇ (success mtype recv)←Recv m;header;body;len;tS;state
                 'Inactive instance' ⎕SIGNAL BROKEN when ~ready
 
-                interrupt←0
+                state←0
+                :Trap 998 1000 ⍝ IPC signals 998 if interrupted by the OS
+                    ⍝ read five bytes to get the message header
 
-                TGETW expectToken
-                :If (TPUTW expectToken)⊢expectDepth>0
-                :AndIf async=1
-                    ⍝ Don't do asynchronous communication if someone is expecting data
-                    (success mtype recv)←¯1 0 ⍬                    
-                    ⎕←'no'
-                    :Return
-                :EndIf
+                    readhdr:
+                    state header←1,⊂fifoIn.Read_ 5
 
-                TGETW readToken
+                    ⍝ Don't allow interrupts while reading the body
+                    tS←2503⌶1
+                    m←⊃header
+                    len←256⊥1↓header
 
-                :Trap 1000
-
-                    :Repeat
-                        :If (~reading) ∧ 5≤≢curdata
-                            ⍝ we're not in a message and have data available for the header
-                            curtype←⊃curdata ⍝ first byte is the type
-                            curlen←256⊥4↑1↓curdata ⍝ next 4 bytes are the length
-                            curdata↓⍨←5
-                            ⍝ we are now reading the message body
-                            reading←1
-                        :ElseIf reading ∧ curlen ≤ ≢curdata
-                            ⍝ we're in a message and have enough data to complete it
-                            (success mtype recv)←1 curtype (curlen↑curdata)
-                            curdata ↓⍨← curlen
-                            ⍝ therefore, we are no longer reading a message
-                            reading←0
-
-                            ⍝ if the interupt was not handled yet, do it now
-                            ⍝ since it arose while waiting for data, we need to signal Python
-                            :If interrupt
-                                itr_ret←0 ⍝ we can jump out afterwards
-                                →handle_interrupt
-                            :EndIf
-                            →out
-                        :Else
-                            ⍝ we don't currently have enough data for what we need
-                            ⍝ (either a message or a header), so we need to read more
-
-                            :Repeat
-                                :If interrupt
-                                    itr_ret←interrupt_handled
-                                    →handle_interrupt
-                                :EndIf
-                                interrupt_handled:
-
-                                ⍝ don't break while in Conga 
-                                threadState←2503⌶1
-                                rc←⊃wait_ret←#.DRC.Wait connSocket 
-                                {}2503⌶threadState
-
-                                :If rc=0 ⍝ success
-                                    rc obj event sdata←wait_ret
-                                    connSocket←obj
-                                    :Select event
-                                    :Case 'Block' ⍝ we have data
-                                        curdata ,← sdata
-                                        :Leave
-                                    :CaseList 'BlockLast' 'Error'
-                                        ⍝ an error has occured
-                                        →error
-                                    :EndSelect
-                                :ElseIf rc=100 ⍝ timeout
-                                    :If async
-                                        ⍝ no data available, signal this
-                                        (success mtype recv)←¯1 0 ⍬
-                                        →out
-                                    :Else
-                                        {}⎕DL 0.5 ⍝ wait half a second and try again
-                                    :EndIf
-                                :Else ⍝ not a timeout and not success → error
-                                    →error
-                                :EndIf
-                            :EndRepeat
-                        :EndIf
+                    ⍝ read the body
+                    body←fifoIn.Read_ len
 
 
-
-                    :EndRepeat
-
+                    (success mtype recv)←1 m body
+                    {}2503⌶tS
                 :Else
-                    ⍝ there was an interrupt
-                    ⍝ this is the worst thing I've done in a long time
-                    ⍝ this idea was suggested to me
-                    ⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝
+                    ⍝ interrupt
+                    ⍝ signal python
+                    :If signalPython
+                        os.Interrupt pid
+                    :EndIf
 
-                    ⍝ There has been an interrupt at this point, but given the stateful
-                    ⍝ nature of this function, we can't just stop. We need to store it 
-                    ⍝ and handle it later. Since Dyalog APL doesn't seem to have a
-                    ⍝ 'no interrupts in here' block, we need to set a flag and then go back
-                    ⍝ where we came from. 
-
-                    interrupt←1
-
-                    ⍝ but how to go back to where we came from?
-                    ⍝ well...
-                    →{
-                        ⍝ 2⊃⎕DM contains: Recv[lineno] INTERRUPT .....
-                        ⍝ we need to jump to 'lineno'
-                        ⍎1↓(+\+⌿1 ¯1×[1]'[]'∘.=r)/r←(∧\' '≠⍵)/⍵
-                    }2⊃⎕DM
+                    ⍝ if we don't have the data yet, read it
+                    →(state=0)/readhdr
                 :EndTrap
-
-                :Return
-
-                error:
-                (success mtype recv)←0 ¯1 sdata
-                ready←0
-                →out
-
-                handle_interrupt:
-                interrupt←0
-                :If ⍬≢serverSocket
-                    ⍝ we are the server, thus the python is ours and needs to be signaled
-                    os.Interrupt pid
-                :EndIf
-                →itr_ret
-
-                out:
-                TPUTW readToken
 
             ∇
         :EndSection
@@ -1075,54 +904,65 @@
 
         ⍝ Initialization common to the server and the client
         ∇ InitCommon
-            reading←0 ⋄ curlen←¯1 ⋄ curdata←'' ⋄ curtype←¯1
             pyaplns←⎕NS''
-            expectToken←#.Py.GetToken
-            ⎕TPUT expectToken
-            readToken←#.Py.GetToken
-            ⎕TPUT readToken
 
             ⍝ check OS
             :If ∨/'Windows'⍷⊃#.⎕WG'APLVersion'
                 os←⎕NEW #.Py.WindowsInterface
             :Else
                 os←⎕NEW UnixInterface
+                #.IPC.Unix.Init
             :EndIf
 
-            ⍝ load Conga
-            :If 0=⎕NC'#.DRC'
-                'DRC'#.⎕CY 'conga.dws'
-            :EndIf
-
-            :If 0≠⊃#.DRC.Init ''
-                'Conga is unavailable.' ⎕SIGNAL BROKEN
-            :EndIf          
         ∇
 
         ⍝ Client initialization routine
-        ∇ InitClient port
+        ∇ InitClient (clin clout)
             InitCommon
-            RunClient port
+            signalPython←0
+            RunClient clin clout
         ∇
 
         ⍝ Initialization routine
         ∇ InitServer (startAsync argfmt);ok;tries;code;clt;success;_;msg;srvport;piducs;spath
             InitCommon
+            signalPython←1
 
             ⍝ Attempt to start a server
-            srvport←StartServer
+            ⍝ srvport←StartServer
+
+            ⍝ make input and output FIFOs
+            
+            fifoIn ← ⎕NEW #.IPC.Unix.FIFO
+            fifoOut ← ⎕NEW #.IPC.Unix.FIFO
+
+            :If debugMsg
+                ⎕←'In: ',fifoIn.Name
+                ⎕←'Out: ',fifoOut.Name
+            :EndIf
+
 
             ⍝ start Python
             spath←(os.GetPath #.Py.ScriptPath),filename
 
             :If ~attachToExistingPython
-                pypath os.StartPython argfmt spath srvport majorVersion
+                ⍝ NOTE: APL's 'out' is Python's 'in' and vice versa, of course
+                pypath os.StartPython argfmt spath fifoOut.Name fifoIn.Name majorVersion
             :EndIf
 
             ready←1
 
+            :If debugMsg
+                ⎕←'Waiting for Python to open its pipe'
+            :EndIf
+
             ⍝ Python client should now send PID
-            AcceptConnection
+            fifoOut.OpenWrite
+            fifoIn.OpenRead
+
+            :If debugMsg
+                ⎕←'Done.'
+            :EndIf
 
             msg piducs←Expect Msgs.PID
             success pid←⎕VFI piducs
@@ -1134,12 +974,6 @@
             :If debugMsg
                 ⎕←'OK! pid=',pid
             :EndIf
-
-            :If startAsync
-                ⍝ run the asynchronous thread
-                asyncThread←{AsyncThread}&⍬
-            :EndIf
-
         ∇
 
         ∇ construct
@@ -1151,7 +985,7 @@
 
         ⍝ param constructor 
         ⍝ this takes a (param value) vector of vectors
-        ∇ paramConstruct param;dC;par;val;clport;startAsync;argfmt
+        ∇ paramConstruct param;dC;par;val;clin;clout;startAsync;argfmt
             :Access Public Instance
             :Implements Constructor
 
@@ -1160,7 +994,7 @@
 
             argfmt←''
             startAsync←0
-            clport←0
+            clin clout←'' ''
             :For (par val) :In param
                 :Select par
                     ⍝ debug parameter
@@ -1170,21 +1004,20 @@
                     ⍝ pass in a different argument format if necessary
                 :Case 'ArgFmt' ⋄ argfmt←val
                     ⍝ construct a client instead of a server
-                :Case 'Client' ⋄ clport←val
+                :Case 'Client' ⋄ clin clout←val
                     ⍝ set the Python major version
                 :Case 'Version' ⋄ majorVersion←val
                     ⍝ wait to attach to existing python
                 :Case 'Attach' ⋄ attachToExistingPython←1
                     ⍝ start the asynchronous thread
-                :Case 'StartAsyncThread' ⋄ startAsync←val
                 :EndSelect
 
             :EndFor
 
-            :If 0=clport
+            :If 0=≢clin
                 InitServer startAsync argfmt
             :Else
-                InitClient clport
+                InitClient clin clout
             :EndIf
         ∇
 
@@ -1194,27 +1027,21 @@
 
             :Trap 0 ⋄ Msgs.STOP USend 'STOP' ⋄ :EndTrap
 
-            :If 0≠≢serverSocket
-                ⍝ This is a server, so do the necessary clean-up
+            ⍝ give Python a small time to respond
+            ⎕DL ÷4
 
-                {}⎕DL ÷4 ⍝give the Python instance a small time to finish up properly
+            ⍝ close the file sockets
+            fifoIn.Close
+            fifoOut.Close
 
-                ⍝ shut down the server 
-                {}#.DRC.Close serverSocket 
+            :If signalPython
 
                 :If ~attachToExistingPython
                     ⍝ try to kill the process we started, in case it has not properly exited    
                     os.Kill pid      
                 :EndIf
 
-                :If ⍬≢asyncThread
-                    ⍝ we have started an asynchronous thread, so kill it if it is still running
-                    ⎕TKILL asyncThread
-                :EndIf
-            :Else
-                ⍝ close the client socket
-                {}#.DRC.Close connSocket
-            :EndIF
+            :EndIf
 
             ⍝ we are no longer ready for commands.
             ready←0
@@ -1224,24 +1051,6 @@
             :Implements Destructor
             Stop
         ∇
-
-        ⍝ Asynchronous message handler. This is used if you want to have
-        ⍝ a connection between two interactive REPLs.
-        ∇ AsyncThread;succ;msg;recv
-            :Access Private Instance
-            :While ready
-                ⎕TGET expectToken
-                :If (⎕TPUT expectToken)⊢expectDepth=0
-                    (succ msg recv)←URecv 1
-
-                    :If succ=1
-                        msg HandleMsg recv
-                    :EndIf
-                :EndIf
-                {}⎕DL÷4
-            :EndWhile
-        ∇
-
 
     :EndClass
 

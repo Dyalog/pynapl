@@ -18,8 +18,10 @@ SCRIPTFILE=os.path.realpath(__file__)
 script="""
     ⎕PW←32767
     {}2⎕FIX'file://%s'
-    port←%d
-    Py.StartAPLSlave port
+    {}2⎕FIX'file://%s'
+    infile←'%s'
+    outfile←'%s'
+    Py.StartAPLSlave infile outfile
     )OFF
 """
 
@@ -36,13 +38,16 @@ def pystr(x):
             return str(x, "utf-8")
     return x 
 
-def posix_dythread(port, dyalog=b"dyalog"):
+def posix_dythread(inf,outf, dyalog=b"dyalog"):
+    # find the path to IPC.dyalog
+    ipcpath=to_bytes(os.path.dirname(SCRIPTFILE))+b'/IPC.dyalog'
+
     # find the path, Py.dyalog should be in the same folder
     path=to_bytes(os.path.dirname(SCRIPTFILE))+b'/Py.dyalog'
     
     # Run the Dyalog instance in this thread
     p=Popen([dyalog, b'-script'], stdin=PIPE, preexec_fn=os.setpgrp)
-    s=script%(pystr(path),port)
+    s=script%(pystr(ipcpath),pystr(path),inf,outf)
     p.communicate(input=s.encode('utf8'))
 
 def cyg_convert_path(path, type):
@@ -123,17 +128,18 @@ def windows_find_dyalog():
     except WindowsError:
         raise RuntimeError("Dyalog not found.")
     
-def dystart(port, dyalog=None):
+def dystart(inf, outf, dyalog=None):
     if os.name=='posix' and not 'CYGWIN' in platform.system():
         if not dyalog: dyalog=b"dyalog" # assume it's just on the path
         
         #thread.start_new_thread(posix_dythread, (port,), {"dyalog":dyalog})
-        t=threading.Thread(target=lambda:posix_dythread(port,dyalog=dyalog))
+        t=threading.Thread(target=lambda:posix_dythread(inf,outf,dyalog=dyalog))
         t.daemon=True
         t.start()
 
     elif os.name=='nt' or 'CYGWIN' in platform.system():
-        
+        raise NotImplemented("todo: windows pipes")
+
         # look up dyalog in registry
         if not dyalog: 
             if 'CYGWIN' in platform.system():

@@ -13,7 +13,8 @@ from __future__ import unicode_literals
 from __future__ import print_function
 
 import socket, os, time, types, signal, select, sys, json
-from . import RunDyalog, Interrupt, WinDyalog
+import tempfile
+from . import RunDyalog, Interrupt, WinDyalog, IPC
 from .Array import *
 from .PyEvaluator import PyEvaluator
 
@@ -118,7 +119,7 @@ class Message(object):
             if s: signal.signal(signal.SIGINT, s) 
 
     @staticmethod
-    def recv(reader,socket,block=True):
+    def recv(reader,block=True):
         """Read a message from a reader.
         
         If block is set to False, then it will return None if no message is
@@ -135,16 +136,21 @@ class Message(object):
             if block:
                 # wait for message available
                 while True:
-                    ready = select.select([socket], [], [], 0.1)
-                    if ready[0]: break
+                    #ready = select.select([reader], [], [], 0.1)
+                    #if ready[0]: break
+                    if reader.avail(0.1): break
             else:
                 # if no message available, return None
-                ready = select.select([socket], [], [], 0.1)
-                if not ready[0]: return None
+                if not reader.avail(0.1): return None
+
+                #ready = select.select([reader], [], [], 0.1)
+                #if not ready[0]: return None
 
             # read the header
             try:
-                mtype = maybe_ord(reader.read(1))
+                inp = reader.read(1)
+
+                mtype = maybe_ord(inp)
                 # once we've started reading, finish reading: turn off the interrupt handler
                 try:
                     setsgn, s = True, signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -154,7 +160,7 @@ class Message(object):
                 lfield = list(map(maybe_ord, reader.read(4)))
                 length = (lfield[0]<<24) + (lfield[1]<<16) + (lfield[2]<<8) + lfield[3]
             except (TypeError, IndexError, ValueError):
-                raise MalformedMessage("out of data while reading message header")
+                raise #MalformedMessage("out of data while reading message header")
 
             # read the data
             try:
@@ -194,7 +200,7 @@ class Connection(object):
                 # already killed it? (destructor might call this function after the user has called it as well)
                 if not self.pid:
                     return
-                try: Message(Message.STOP, "STOP").send(self.conn.sockfile)
+                try: Message(Message.STOP, "STOP").send(self.conn.outfile)
                 except ValueError: pass # if already closed, don't care
                 # give the APL process half a second to exit cleanly
                 time.sleep(.5)
@@ -313,7 +319,7 @@ class Connection(object):
 
             Input must be string, the lines of which will be passed to ⎕FX."""
 
-            Message(Message.EXEC, tradfn).send(self.conn.sockfile)
+            Message(Message.EXEC, tradfn).send(self.conn.outfile)
             reply = self.conn.expect(Message.OK)
 
             if reply.type == Message.ERR:
@@ -325,7 +331,7 @@ class Connection(object):
             """Run an APL expression, return string representation"""
             
             # send APL message
-            Message(Message.REPR, aplcode).send(self.conn.sockfile)
+            Message(Message.REPR, aplcode).send(self.conn.outfile)
             reply = self.conn.expect(Message.REPRRET)
 
             if reply.type == Message.ERR:
@@ -363,7 +369,7 @@ class Connection(object):
             # print "evaluating: ", aplexpr
 
             payload = APLArray.from_python([aplexpr, args]).toJSONString()
-            Message(Message.EVAL, payload).send(self.conn.sockfile)
+            Message(Message.EVAL, payload).send(self.conn.outfile)
 
             reply = self.conn.expect(Message.EVALRET)
 
@@ -381,23 +387,23 @@ class Connection(object):
     def APLClient(DEBUG=False, dyalog=None):
         """Start an APL client. This function returns an APL instance."""
         
-        # start a server
-        srvsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        srvsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        srvsock.bind(('localhost', 0))
-        _, port = srvsock.getsockname()
-
-        if DEBUG:print("Waiting for connection at %d" % port)
-        srvsock.listen(1)
+        # make two named pipes
+        inpipe = IPC.FIFO()
+        outpipe = IPC.FIFO()
         
-        if not DEBUG: RunDyalog.dystart(port, dyalog=dyalog)
+        if DEBUG:
+            print("in: ",inpipe.name)
+            print("out: ",outpipe.name)
 
-        conn, _ = srvsock.accept()
+        # start up Dyalog
+        if not DEBUG: RunDyalog.dystart(outpipe.name, inpipe.name, dyalog=dyalog)
+
+        # start the writer first
+        outpipe.openWrite()
+        inpipe.openRead()
 
         if DEBUG:print("Waiting for PID...")
-        connobj = Connection(conn, signon=False)
-
-        srvsock.close()
+        connobj = Connection(inpipe, outpipe, signon=False)
 
         # ask for the PID
         pidmsg = connobj.expect(Message.PID)
@@ -416,12 +422,14 @@ class Connection(object):
             
             return apl
 
-    def __init__(self, socket, signon=True):
-        self.socket = socket
-        self.sockfile = socket.makefile('rwb')
+    def __init__(self, infile, outfile, signon=True):
+        #self.socket = socket
+        # self.sockfile = socket.makefile('rwb')
+        self.infile=infile
+        self.outfile=outfile
         self.apl = Connection.APL(self)
         if signon:
-            Message(Message.PID, str(os.getpid())).send(self.sockfile)
+            Message(Message.PID, str(os.getpid())).send(self.outfile)
 
     def runUntilStop(self, asyncHandler=None):
         """Receive messages and respond to them until STOP is received.
@@ -435,7 +443,7 @@ class Connection(object):
 
         while not self.stop:
             # is there a message available?
-            msg = Message.recv(self.sockfile, self.socket, block=False)
+            msg = Message.recv(self.infile, block=False)
 
             if not msg is None:
                 # yes, respond to it
@@ -453,7 +461,7 @@ class Connection(object):
             
         while True: 
             try:
-                msg = Message.recv(self.sockfile,self.socket)
+                msg = Message.recv(self.infile)
 
                 if msg.type in (msgtype, Message.ERR):
                     return msg
@@ -470,7 +478,7 @@ class Connection(object):
             # If there is an interrupt during 'respond', then that means
             # the Python side was interrupted, and we need to tell the
             # APL this.
-            Message(Message.ERR, "Interrupt").send(self.sockfile)
+            Message(Message.ERR, "Interrupt").send(self.outfile)
 
     def respond_inner(self, message):
         """Respond to a message"""
@@ -478,24 +486,24 @@ class Connection(object):
         t = message.type
         if t==Message.OK:
             # return 'OK' to such messages
-            Message(Message.OK, message.data).send(self.sockfile)
+            Message(Message.OK, message.data).send(self.outfile)
 
         elif t==Message.PID:
             # this is interpreted as asking for the PID
-            Message(Message.PID, str(os.getpid())).send(self.sockfile)
+            Message(Message.PID, str(os.getpid())).send(self.outfile)
         
         elif t==Message.STOP:
             # send a 'STOP' back in acknowledgement and set the stop flag
             self.stop = True
-            Message(Message.STOP, "STOP").send(self.sockfile)
+            Message(Message.STOP, "STOP").send(self.outfile)
         
         elif t==Message.REPR:
             # evaluate the input and send the Python representation back
             try:
                 val = repr(eval(message.data))
-                Message(Message.REPRRET, val).send(self.sockfile)
+                Message(Message.REPRRET, val).send(self.outfile)
             except Exception as e:
-                Message(Message.ERR, repr(e)).send(self.sockfile)
+                Message(Message.ERR, repr(e)).send(self.outfile)
 
         elif t==Message.EXEC:
             # execute some Python code in the global context
@@ -505,9 +513,9 @@ class Connection(object):
                     script = str(script, 'utf-8')
 
                 PyEvaluator.executeInContext(script, self.apl)
-                Message(Message.OK, '').send(self.sockfile)
+                Message(Message.OK, '').send(self.outfile)
             except Exception as e:
-                Message(Message.ERR, repr(e)).send(self.sockfile)
+                Message(Message.ERR, repr(e)).send(self.outfile)
 
 
         elif t==Message.EVAL:
@@ -535,10 +543,10 @@ class Connection(object):
                     raise MalformedMessage("Argument list must be rank-1 array.")
 
                 result = PyEvaluator(code, args, self).go().toJSONString()
-                Message(Message.EVALRET, result).send(self.sockfile)
+                Message(Message.EVALRET, result).send(self.outfile)
             except Exception as e:
                 #raise
-                Message(Message.ERR, repr(e)).send(self.sockfile)
+                Message(Message.ERR, repr(e)).send(self.outfile)
 
 
         elif t==Message.DBGSerializationRoundTrip:
@@ -553,9 +561,9 @@ class Connection(object):
                 print("Sending back: ", serialized)
                 print("---------------")
 
-                Message(Message.DBGSerializationRoundTrip, serialized).send(self.sockfile)
+                Message(Message.DBGSerializationRoundTrip, serialized).send(self.outfile)
             except Exception as e:
-                Message(Message.ERR, repr(e)).send(self.sockfile)          
+                Message(Message.ERR, repr(e)).send(self.outfile)          
         else:
-            Message(Message.ERR, "unknown message type #%d / data:%s"%(message.type,message.data)).send(self.sockfile)
+            Message(Message.ERR, "unknown message type #%d / data:%s"%(message.type,message.data)).send(self.outfile)
 
