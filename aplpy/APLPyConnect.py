@@ -13,6 +13,7 @@ from __future__ import unicode_literals
 from __future__ import print_function
 
 import socket, os, time, types, signal, select, sys, json
+import tempfile
 from . import RunDyalog, Interrupt, WinDyalog
 from .Array import *
 from .PyEvaluator import PyEvaluator
@@ -389,23 +390,26 @@ class Connection(object):
     def APLClient(DEBUG=False, dyalog=None):
         """Start an APL client. This function returns an APL instance."""
         
-        # start a server
-        srvsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        srvsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        srvsock.bind(('localhost', 0))
-        _, port = srvsock.getsockname()
+        # make two named pipes
+        inname = tempfile.mktemp()
+        outname = tempfile.mktemp()
 
-        if DEBUG:print("Waiting for connection at %d" % port)
-        srvsock.listen(1)
-        
-        if not DEBUG: RunDyalog.dystart(port, dyalog=dyalog)
+        os.mkfifo(inname, 0o600)
+        os.mkfifo(outname, 0o600)
+   
+        if DEBUG:
+            print("in: ",inname)
+            print("out: ",outname)
 
-        conn, _ = srvsock.accept()
+        # start up Dyalog
+        if not DEBUG: RunDyalog.dystart(outname, inname, dyalog=dyalog)
+
+        # start the writer first
+        writer = open(outname, "wb")
+        reader = open(inname, "rb")
 
         if DEBUG:print("Waiting for PID...")
-        connobj = Connection(conn, signon=False)
-
-        srvsock.close()
+        connobj = Connection(reader, writer, signon=False)
 
         # ask for the PID
         pidmsg = connobj.expect(Message.PID)

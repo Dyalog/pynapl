@@ -31,9 +31,10 @@
         }⎕THIS
     ∇
 
-    ⍝ Start an APL slave and connect to the server at the given port
-    ∇StartAPLSlave port;py
-        py←⎕NEW Py ('Client' port)
+    ⍝ Start an APL slave and connect to the given input and output pipes
+    ∇StartAPLSlave (inf outf);py
+        
+        py←⎕NEW Py (⊂('Client' (inf outf)))
     ∇
 
     ⍝ Make an error object
@@ -533,29 +534,30 @@
 
 
             ⍝ Run a client on a given a port
-            ∇ RunClient port;rv;ok;msg;data
+            ∇ RunClient (in out);rv;ok;msg;data
 
-                rv←#.DRC.Clt '' 'localhost' port 'Raw'
-                :If 0=⊃rv
-                    ⍝ connection established
-                    connSocket←2⊃rv
-                    ready←1
+                ⍝ bind the sockets
+                fifoIn ← ⎕NEW #.IPC.Unix.FIFO in
+                fifoOut ← ⎕NEW #.IPC.Unix.FIFO out
 
-                    ⍝ send out the PID message
-                    Msgs.PID USend ⍕os.GetPID
+                ⍝ start reading
+                fifoIn.OpenRead
+                fifoOut.OpenWrite
 
-                    ⍝ handle incoming messages
-                    :Repeat
-                        ok msg data←URecv 0
-                        :If ~ok ⋄ :Leave ⋄ :EndIf
-                        msg HandleMsg data
-                    :Until ~ready
-                :Else
-                    ⎕←rv
-                    'Connection to Python server failed.'⎕SIGNAL BROKEN
-                :EndIf
+                ⍝ connection established
+                ready←1
 
+                ⍝ send out the PID message
+                Msgs.PID USend ⍕os.GetPID
+
+                ⍝ handle incoming messages
+                :Repeat
+                    ok msg data←URecv 0
+                    :If ~ok ⋄ :Leave ⋄ :EndIf
+                    msg HandleMsg data
+                :Until ~ready
             ∇
+
             ⍝ Find an open port and start a server on it
             ∇ port←StartServer;tryPort;rv
                 :For tryPort :In ⌽⍳50000 ⍝ 65535
@@ -603,9 +605,6 @@
             ∇
 
             ⍝ Send a message and expect a response
-            ⍝ This is done in one go in order to set expectDepth before the message
-            ⍝ is actually sent. This will prevent the asynchrounous message handler from
-            ⍝ cutting in and stealing the response. 
             ∇ (type data)←response_type ExpectAfterSending (msgtype msgdata)
                 msgtype USend msgdata
                 (type data)←Expect response_type 
@@ -912,14 +911,16 @@
                 os←⎕NEW #.Py.WindowsInterface
             :Else
                 os←⎕NEW UnixInterface
+                #.IPC.Unix.Init
             :EndIf
-      
+
         ∇
 
         ⍝ Client initialization routine
-        ∇ InitClient port
+        ∇ InitClient (clin clout)
             InitCommon
-            RunClient port
+            signalPython←0
+            RunClient clin clout
         ∇
 
         ⍝ Initialization routine
@@ -931,7 +932,7 @@
             ⍝ srvport←StartServer
 
             ⍝ make input and output FIFOs
-            #.IPC.Unix.Init
+            
             fifoIn ← ⎕NEW #.IPC.Unix.FIFO
             fifoOut ← ⎕NEW #.IPC.Unix.FIFO
 
@@ -940,7 +941,7 @@
                 ⎕←'Out: ',fifoOut.Name
             :EndIf
 
-         
+
             ⍝ start Python
             spath←(os.GetPath #.Py.ScriptPath),filename
 
@@ -954,7 +955,7 @@
             :If debugMsg
                 ⎕←'Waiting for Python to open its pipe'
             :EndIf
-            
+
             ⍝ Python client should now send PID
             fifoOut.OpenWrite
             fifoIn.OpenRead
@@ -984,7 +985,7 @@
 
         ⍝ param constructor 
         ⍝ this takes a (param value) vector of vectors
-        ∇ paramConstruct param;dC;par;val;clport;startAsync;argfmt
+        ∇ paramConstruct param;dC;par;val;clin;clout;startAsync;argfmt
             :Access Public Instance
             :Implements Constructor
 
@@ -993,7 +994,7 @@
 
             argfmt←''
             startAsync←0
-            clport←0
+            clin clout←'' ''
             :For (par val) :In param
                 :Select par
                     ⍝ debug parameter
@@ -1003,7 +1004,7 @@
                     ⍝ pass in a different argument format if necessary
                 :Case 'ArgFmt' ⋄ argfmt←val
                     ⍝ construct a client instead of a server
-                :Case 'Client' ⋄ clport←val
+                :Case 'Client' ⋄ clin clout←val
                     ⍝ set the Python major version
                 :Case 'Version' ⋄ majorVersion←val
                     ⍝ wait to attach to existing python
@@ -1013,10 +1014,10 @@
 
             :EndFor
 
-            :If 0=clport
+            :If 0=≢clin
                 InitServer startAsync argfmt
             :Else
-                InitClient clport
+                InitClient clin clout
             :EndIf
         ∇
 
