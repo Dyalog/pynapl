@@ -33,7 +33,7 @@
 
     ⍝ Start an APL slave and connect to the given input and output pipes
     ∇StartAPLSlave (inf outf);py
-        
+
         py←⎕NEW Py (⊂('Client' (inf outf)))
     ∇
 
@@ -254,7 +254,7 @@
 
         ∇ Kill pid
             :Access Public Shared
-            ⎕SH 'kill ', ⍕pid
+            ⎕SH 'kill ', (⍕pid), ' 2>/dev/null'
         ∇
 
 
@@ -601,7 +601,11 @@
 
                 sizefield←(4/256)⊤≢data
                 ⍝ send the message
-                fifoOut.Write (mtype,sizefield,data)
+                :Trap 999
+                    fifoOut.Write (mtype,sizefield,data)
+                :Else
+                    ready←0
+                :EndTrap
             ∇
 
             ⍝ Send a message and expect a response
@@ -660,32 +664,38 @@
                 'Inactive instance' ⎕SIGNAL BROKEN when ~ready
 
                 state←0
-                :Trap 998 1000 ⍝ IPC signals 998 if interrupted by the OS
-                    ⍝ read five bytes to get the message header
+                :Trap 999
+                    :Trap 998 1000 ⍝ IPC signals 998 if interrupted by the OS
+                        ⍝ read five bytes to get the message header
 
-                    readhdr:
-                    state header←1,⊂fifoIn.Read_ 5
+                        readhdr:
+                        state header←1,⊂fifoIn.Read_ 5
 
-                    ⍝ Don't allow interrupts while reading the body
-                    tS←2503⌶1
-                    m←⊃header
-                    len←256⊥1↓header
+                        ⍝ Don't allow interrupts while reading the body
+                        tS←2503⌶1
+                        m←⊃header
+                        len←256⊥1↓header
 
-                    ⍝ read the body
-                    body←fifoIn.Read_ len
+                        ⍝ read the body
+                        body←fifoIn.Read_ len
 
 
-                    (success mtype recv)←1 m body
-                    {}2503⌶tS
+                        (success mtype recv)←1 m body
+                        {}2503⌶tS
+                    :Else
+                        ⍝ interrupt
+                        ⍝ signal python
+                        :If signalPython
+                            os.Interrupt pid
+                        :EndIf
+
+                        ⍝ if we don't have the data yet, read it
+                        →(state=0)/readhdr
+                    :EndTrap
                 :Else
-                    ⍝ interrupt
-                    ⍝ signal python
-                    :If signalPython
-                        os.Interrupt pid
-                    :EndIf
-
-                    ⍝ if we don't have the data yet, read it
-                    →(state=0)/readhdr
+                    ⍝ error
+                    state←0
+                    (success mtype recv)←0 0 ⍬
                 :EndTrap
 
             ∇
@@ -932,7 +942,7 @@
             ⍝ srvport←StartServer
 
             ⍝ make input and output FIFOs
-            
+
             fifoIn ← ⎕NEW #.IPC.Unix.FIFO
             fifoOut ← ⎕NEW #.IPC.Unix.FIFO
 

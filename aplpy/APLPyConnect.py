@@ -202,18 +202,25 @@ class Connection(object):
                     return
                 try: Message(Message.STOP, "STOP").send(self.conn.outfile)
                 except ValueError: pass # if already closed, don't care
+                
+                # close the pipes
+                try:
+                    self.conn.infile.close()
+                    self.conn.outfile.close()
+                except:
+                    raise
+                    pass # we're gone anyway.
+
                 # give the APL process half a second to exit cleanly
                 time.sleep(.5)
                 
+         
                 if not self.DEBUG:
                     try: os.kill(self.pid, 15) # SIGTERM
                     except OSError: pass # just leak the instance, it will be cleaned up once Python exits
                 
                 self.pid=0
 
-                # the connection is now gone, so close the socket
-                try:self.conn.socket.close()
-                except:pass
             else: 
                 raise ValueError("Connection was not started from the Python end.")
 

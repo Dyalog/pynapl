@@ -9,6 +9,7 @@ from __future__ import print_function
 
 import sys, os, tempfile, select
 
+
 class FIFO(object):
     def avail(self,timeout): raise NotImplemented()
     def read(self,amount): raise NotImplemented()
@@ -21,6 +22,7 @@ class FIFO(object):
 class UnixFIFO(FIFO):
     fileobj = None
     name = None
+    mode = None
 
     def __init__(self, name=None):
         if name==None:
@@ -37,9 +39,10 @@ class UnixFIFO(FIFO):
         inp = self.fileobj.read(amount)
 
         # this is necessary in Python 2 for some reason
-        if sys.version_info.major==2 and inp=='':
-            self.fileobj.seek(0)
-            inp = self.fileobj.read(amount)
+        if len(inp)==0:
+            # eof? shouldn't happen, reopen the file
+            self.fileobj = open(self.name, self.mode)
+            inp = self.read(amount)
 
         return inp
 
@@ -47,10 +50,12 @@ class UnixFIFO(FIFO):
         self.fileobj.write(data)
 
     def openRead(self):
-        self.fileobj = open(self.name,'rb')
+        self.mode = 'rb'
+        self.fileobj = open(self.name, self.mode)
 
     def openWrite(self):
-        self.fileobj = open(self.name,'wb')
+        self.mode = 'wb'
+        self.fileobj = open(self.name, self.mode)
 
     def close(self):
         if not self.fileobj is None:
