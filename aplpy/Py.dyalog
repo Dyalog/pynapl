@@ -469,6 +469,9 @@
 
         ⍝ This is set to 1 if this is our Python (so we need to signal it)
         :Field Private signalPython←0
+        
+        ⍝ This field can be set to 0 to disallow interrupts completely
+        :Field Private noInterrupts←0
 
         ⍝ JSON serialization/deserialization
         :Section JSON serialization/deserialization
@@ -661,8 +664,8 @@
 
                         
                         readhdr:
-                        ⍝ explicitly allow traps in here
-                        {}2503⌶0
+                        ⍝ explicitly allow traps in here unless they are turne doff
+                        {}2503⌶noInterrupts
                         header←fifoIn.Read 5
                         
                         readbdy:
@@ -776,7 +779,7 @@
 
                         ⍝ we explicitly _do_ want to be able to be interrupted while exec'ing
                         
-                        tS←2503⌶0
+                        tS←2503⌶noInterrupts
                         
                         ⍝ send the result back, if no result then []
                         rslt←pyaplns.{85::⍬ ⋄ 0(85⌶)⍵}expr                   
@@ -1083,6 +1086,8 @@
                 :Case 'Attach' ⋄ attachToExistingPython←1
                     ⍝ start the asynchronous thread 
                 :Case 'ForceTCP' ⋄ forceTCP←val
+                    ⍝ disallow interrupts
+                :Case 'NoInterrupts' ⋄ noInterrupts←val 
                 :EndSelect
 
             :EndFor
