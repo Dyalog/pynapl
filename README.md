@@ -21,7 +21,8 @@ in the same directory as the `Py.dyalog` file.
 
 To start a Python interpreter, make a new instance of the
 `Py.Py` class. This will start a Python instance in the background,
-and connect to it. 
+and connect to it. On Unix, this is done using two pipes; on Windows
+this is done using a TCP connection.
 
 ```apl
 py ← ⎕NEW Py.Py
@@ -37,8 +38,9 @@ class, namely:
 | Option | Argument | Purpose |
 | --- | --- | --- |
 | `Attach` | ignored | Do not start up a Python instance, but allow attachment to one that is already running. A port number will be given, and it will wait for a connection from the Python side. The Python side can be told to connect using `APL.client(port)`. |
+| `ForceTCP` | boolean | Use TCP mode even on Unix. |
 | `PyPath` | path to an interpreter | Start the Python interpreter given in the argument, instead of the system one. |
-| `ArgFmt` | string, where `⍎` will be replaced by the path to the slave script, and `⍠` by the port number | When used in combination with `PyPath`, use a custom argument format rather than the standard one. |
+| `ArgFmt` | string, where `⍎` will be replaced by the path to the slave script, `→` by the input pipe file (or `TCP` if in TCP mode), and `←` by the output pipe file (or port number if in TCP mode) | When used in combination with `PyPath`, use a custom argument format rather than the standard one. |
 | `Version` | major Python version (2 or 3) | Start either a Python 2 or 3 interpreter, depending on which is given. The default is currently 2. |
 | `Debug` | boolean | If the boolean is 1, turns on debug messages and also does not start up a Python instance. |
 
@@ -52,7 +54,7 @@ py ← ⎕NEW Py.Py('Version' 3) ⍝ use Python 3 instead of 2
 ```apl
 ⍝ start a Blender instance and control that instead of a normal Python
 ⍝ (if on Windows, you have to pass in the absolute path to blender.exe instead)
-py ← ⎕NEW Py.Py (('PyPath' 'blender') ('ArgFmt' '-P "⍎" -- ⍠ thread'))
+py ← ⎕NEW Py.Py (('PyPath' 'blender') ('ArgFmt' '-P "⍎" → ← thread') ('ForceTCP' 1))
 ```
 
 
@@ -98,7 +100,7 @@ to APL.
 
 ```apl
      ⍝ access a variable
-     '__name___' py.Eval ⍬
+     '___name___' py.Eval ⍬
 APLPyConnect
 
      ⍝ add two numbers
@@ -112,6 +114,11 @@ APLPyConnect
      ⍝ round trip
      'APL.eval("2+2")' py.Eval ⍬
 4
+
+     ⍝ set a variable on the Python side
+     'x' py.Set 42
+     py.Eval 'x'
+42
 
      ⍝ alternate syntax when there are no arguments
      py.Eval 'APL.eval("2+2")' 
@@ -337,6 +344,9 @@ custom container objects to be used.
 
 _NOTE_: if the object is an infinite generator, it will cause a hang.
 
+If the numpy library is available, numpy matrices will be automatically
+converted to APL matrices. 
+
 
 #### From APL to Python
 
@@ -371,10 +381,21 @@ range.
 
 ## Implementation details
 
-Whichever side initiates will find an unused port, and start up a
-network server. It will listen for a connection from `localhost`.
-It will then start up the other side, and run a client program
-which will be used to run code there. 
+On Unix, there are two ways in which the connection between APL and
+Python can be made. 
+
+ 1. The default way is by using two named pipes, which
+the initiating side will create (using `mkfifo`) and pass to the
+client program. 
+
+ 2. It can also be set to use a TCP connection. The initiating
+ side will start up a TCP server (using Conga on the APL side)
+ on an unused port, and listen for a connection from the client side.
+
+On Windows, only TCP mode is supported. On Unix, TCP mode may be
+necessary to use non-standard interpreters (Blender in particular
+does not like pipes much). TCP mode has about twice the latency as
+pipe mode. 
 
 ### Communication
 
@@ -405,6 +426,21 @@ The contents of the body are UTF-8 encoded text, usually JSON.
 | `11` (`EVALRET`) | a serialized object | the result of an earlier `EVAL` |
 | `253` (`DBGSerializationRoundTrip`) | a serialized object | deserializes and reserializes the object on the other side, then sends the result back using the same message code (for debugging) |
 | `255` (`ERR`) | an UTF-8 string containing the description of the error | signal an error |
+
+#### JSON messages
+
+##### `EVAL`: 
+
+The `EVAL` message is a JSON list containing two elements. The first element
+should be a string containing the expression to evaluate, the second element
+should be a (possibly empty) list of arguments. 
+
+###### `ERR`:
+
+The `ERR` message is a JSON dictionary containing at least a `Message` field,
+which contains the error message. Errors coming from APL may also contain a
+`DMX` field, which contains the JSON representation of Dyalog APL's `⎕DMX`
+object.
 
 #### Reentrancy
 
