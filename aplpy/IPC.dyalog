@@ -4,9 +4,9 @@
 
     ⍝ The IPC functions signal 999 on error,
     ⍝ and 998 on interrupt.
-     
-        
-    
+
+
+
     ∇Init
         ⍝ Figure out which OS we're on and select the correct IPC class
         :If 'Windows'≡7↑⊃#.⎕WG'APLVersion'
@@ -19,39 +19,39 @@
             #.IPC.OS←#.IPC.Unix
         :EndIf             
     ∇
-              
-    
+
+
     ⍝ Use Conga
     :Namespace TCP
-         ∇ Init  
+        ∇ Init  
             ⍝ load Conga
             :If 0=⎕NC'#.DRC'
                 'DRC'#.⎕CY'conga.dws'
             :EndIf
-            
+
             :If 0≠⊃#.DRC.Init ''
                 'Conga is unavailable.' ⎕SIGNAL 999
             :EndIf
-                 
-         ∇       
-         
-         :Class Connection
-             :Field reading←0
-             :Field curlen←¯1
-             :Field curdata←''
-             :Field curtype←¯1
-                            
-             :Field socket←⍬
-             :Field srvsock←⍬
-                
-             :Field ready←0
-             
-             ∇n←Name
+
+        ∇       
+
+        :Class Connection
+            :Field reading←0
+            :Field curlen←¯1
+            :Field curdata←''
+            :Field curtype←¯1
+
+            :Field socket←⍬
+            :Field srvsock←⍬
+
+            :Field ready←0
+
+            ∇n←Name
                 :Access Public
                 n←'TCP/IP'
-             ∇
+            ∇
 
-             ∇Connect (host port);rv
+            ∇Connect (host port);rv
                 :Access Public
                 rv←#.DRC.Clt '' host port 'Raw'
                 :If 0=⊃rv
@@ -62,10 +62,10 @@
                     ⍝ failure
                     'Failed to connect' ⎕SIGNAL 999
                 :EndIf
-             ∇
-             
-             ⍝Start a server
-             ∇port←StartServer;tryPort;rv
+            ∇
+
+            ⍝Start a server
+            ∇port←StartServer;tryPort;rv
                 :Access Public
                 :For tryPort :In ⌽⍳65535
                     rv←#.DRC.Srv '' 'localhost' tryPort 'Raw'
@@ -75,12 +75,12 @@
                         :Return
                     :EndIf
                 :EndFor
-                
+
                 'Failed to start server' ⎕SIGNAL 999
-             ∇
-             
-             ⍝ Wait for a connection
-             ∇AcceptConnection;rc;rval
+            ∇
+
+            ⍝ Wait for a connection
+            ∇AcceptConnection;rc;rval
                 :Access Public
                 :Repeat
                     rc←⊃rval←#.DRC.Wait srvsock
@@ -96,35 +96,35 @@
                         ('Failed to accept connection ',⍕rval)⎕SIGNAL 999
                     :EndIF 
                 :EndRepeat
-             ∇
-                             
-             ∇Write data;rc
+            ∇
+
+            ∇Write data;rc
                 :Access Public
-                
+
                 'Inactive connection'⎕SIGNAL(~ready)/999
-                
+
                 rc←#.DRC.Send socket data
                 :If 0≠⊃rc    
                     ready←0
                     ('Socket error ',⍕rc)⎕SIGNAL 999
                 :EndIf
-             ∇     
-             
-             ∇Close
+            ∇     
+
+            ∇Close
                 :Access Public
-                
+
                 {}#.DRC.Close socket
                 :If srvsock≢⍬
                     {}#.DRC.Close srvsock   
                 :EndIf 
                 ready←0
-             ∇
+            ∇
 
-             ∇data←Read nbytes;interrupt;tS;rc;wait_ret;obj;event;sdata;r
+            ∇data←Read nbytes;interrupt;tS;rc;wait_ret;obj;event;sdata;r
                 :Access Public          
-                
+
                 'Inactive connection'⎕SIGNAL(~ready)/999 
-                
+
                 interrupt←0 
 
                 :Trap 1000
@@ -139,17 +139,17 @@
                             ⍝ there is enough data to return
                             data←nbytes↑curdata
                             curdata↓⍨←nbytes
-                            
+
                             →out
                         :Else
                             ⍝ there is not, so go read some more
-                            
+
                             :Repeat
                                 :If interrupt
                                     interrupt←0
                                     'Interrupt'⎕SIGNAL 998 ⍝ to match the Unix pipes
                                 :EndIf
-                                               
+
                                 tS←2503⌶1 ⍝ don't break while in Conga
                                 rc←⊃wait_ret←#.DRC.Wait socket
                                 {}2503⌶tS
@@ -180,17 +180,17 @@
                     →⍎1↓(+\+⌿1 ¯1×[1]'[]'∘.=r)/r←(∧\' '≠r)/r←2⊃⎕DM
                 :EndTrap  
                 →out
-                
+
                 err:
                 ready←0
                 ('Socket error ',⍕wait_ret)⎕SIGNAL 999 
                 out:
-             ∇
-         :EndClass
+            ∇
+        :EndClass
     :EndNamespace
 
     :Namespace Windows   
-         :Section Assorted Windows constants
+        :Section Assorted Windows constants
             GENERIC_WRITE←16⊥4 0 0 0 0 0 0 0
             GENERIC_READ ←16⊥8 0 0 0 0 0 0 0
             CREATE_NEW   ←1
@@ -199,9 +199,9 @@
             PIPE_ACCESS_INBOUND←1
             PIPE_ACCESS_OUTBOUND←2 
             PIPE_TYPE_BYTE←0
-            
-         :EndSection
-         ∇ Init  
+
+        :EndSection
+        ∇ Init  
             ⎕NA'P  Kernel32.dll|CreateNamedPipeW <0T[] U4 U4 U4 U4 U4 U4 P'
             ⎕NA'P  Kernel32.dll|CreateFileW <0T[] U4 U4 P U4 U4 P'
             ⎕NA'I  Kernel32.dll|WriteFile& P <U1[] U4 >U4'
@@ -211,50 +211,50 @@
             ⎕NA'I  Kernel32.dll|PeekNamedPipe P =U1[] U4 >U4 >U4 >U4'  
             ⎕NA'I  Kernel32.dll|ConnectNamedPipe& P P'
             ⎕NA'   Rpcrt4.dll  |UuidCreate >U1[8]'
-         ∇
-         
-         :Class FIFO
+        ∇
+
+        :Class FIFO
             :Field Private name
             :Field Private handle
             :Field Private open←0 
             :Field Private mkNew←0
-            
+
             :Field Private pipeReadWaiting←0
             :Field Private NAME_PFX←'\\.\pipe\APLPY-'
 
             ⍝ See what the invalid handle is   
             ∇i←invalidHandle                
                 :Access Public
-                
+
                 ⍝ This is a very hacky way to do it, but it "works". 
                 ⍝ The name is known invalid and so is the max_instances parameter (256).
                 i←#.IPC.Windows.CreateNamedPipeW ',\!INVALID!\,' 2 0 256 512 512 0 0
             ∇                                                                       
 
             ∇initNew;r  
-                
+
                 :Access Public
                 :Implements Constructor
-                
+
                 mkNew←1                              
 
                 ⍝ generate a random name for our pipe
                 ⎕←'Initializing pipe ',name←NAME_PFX,1↓∊'-',¨⍕¨#.IPC.Windows.UuidCreate 0  
             ∇    
-            
+
             ∇initOpen fn
                 :Access Public
                 :Implements Constructor
-                
+
                 mkNew←0
                 name←fn
             ∇             
-                    
+
             ∇ destroy
                 :Implements Destructor
                 Close
             ∇
-                                      
+
             ⍝ See how much data is available
             ∇ (b data avl)←Peek_ n;dummy1;rd;dummy2
                 :Access Public
@@ -265,13 +265,13 @@
                 :Access Public
                 n←name
             ∇
-             
-            
+
+
             readbuf←⍬
             ∇ data←Read nbytes;b;avl;err;data 
                 :Access Public
                 ⍝ This probably isn't the best way to do APL-interruptable synchronous I/O
-                
+
                 ⍝ Busy-wait until we have enough data available
                 :Trap 1000  
                     retry:   →skip
@@ -280,7 +280,7 @@
                         b data avl←Peek_ nbytes
                         pipeReadWaiting×←~b
                     :Until (~b)∨avl≥nbytes
-                    
+
                     ⍝ If we can't peek, then something has gone horribly wrong   
                     :If ~b
                         err←#.IPC.Windows.GetLastError
@@ -295,7 +295,7 @@
                     :EndIf                                               
 
                     skip:
-                                        ⍝ We should now have enough data available to read, so read it 
+                    ⍝ We should now have enough data available to read, so read it 
                     pipeReadWaiting←0
                     data←Read_ nbytes
                 :Else                      
@@ -304,7 +304,7 @@
                     'Interrupt' ⎕SIGNAL 998
                 :EndTrap
             ∇
-                   
+
             ⍝ Low-level read
             ∇ data←Read_ nbytes;r;n;bytes
                 :Access Public
@@ -314,13 +314,13 @@
                 :EndIf
                 data←n↑bytes
             ∇   
-            
+
             ⍝ Dunno if we need any special wrapping for this but we'll see
             ∇ Write bytes;r 
                 :Access Public
                 {}Write_ bytes
             ∇
-            
+
             ∇ n←Write_ bytes;r
                 :Access Public
                 r n←#.IPC.Windows.WriteFile handle bytes (≢bytes) 0
@@ -328,7 +328,7 @@
                     ('Windows error: ',⍕#.IPC.Windows.GetLastError)⎕SIGNAL 999
                 :EndIf
             ∇
-            
+
             ⍝ Close the handle
             ∇ Close
                 :Access Public
@@ -336,7 +336,7 @@
                 open←0
                 {}#.IPC.Windows.CloseHandle handle
             ∇                                              
-            
+
             ⍝ New pipe
             ∇ New_ mode
                 :Access Public                
@@ -345,7 +345,7 @@
                 #.IPC.Windows.ConnectNamedPipe handle 0
                 open←1
             ∇ 
-            
+
             ⍝ Open pipe
             ∇ Open_ mode;err
                 :Access Public
@@ -354,8 +354,8 @@
                 ('Cannot open pipe: ',⍕err)⎕SIGNAL(handle=invalidHandle)/999 
                 open←1
             ∇
-                      
-                 
+
+
             ⍝ Open for reading
             ∇ OpenRead
                 :Access Public    
@@ -367,7 +367,7 @@
                 :EndIf 
 
             ∇                               
-            
+
             ⍝ Open for writing
             ∇ OpenWrite
                 :Access Public
@@ -379,7 +379,7 @@
             ∇
 
 
-         :EndClass       
+        :EndClass       
     :EndNamespace
 
     :Namespace Unix
@@ -483,12 +483,7 @@
             ⍝ Read an amount of bytes from the file.
             ∇ x←Read n;r;bytes;tS;dat
                 :Access Public
-                ⍝ We want to respond to APL interrupts and OS interrupts the same way.
-                :Trap 1000
-                    x←Read_ n 
-                :Else
-                    'Interrupt' ⎕SIGNAL 998
-                :EndTrap
+                x←Read_ n        
             ∇
 
             ⍝ Write an amount of bytes to the file
@@ -503,9 +498,10 @@
 
             ⍝ Read an amount of bytes from the file
             ⍝ (Low-level)
-            ∇ x←Read_ n;r;bytes
+            ∇ x←Read_ n;r;bytes;tS
                 :Access Public
                 r bytes←#.IPC.Unix.read id(n/0)n
+                tS←2503⌶1
                 :If r=¯1
                     ⍝ Something went wrong
                     :If #.IPC.Unix.geterrno=#.IPC.Unix.EINTR
@@ -518,6 +514,7 @@
                 :EndIf
 
                 x←r↑bytes
+                {}2503⌶tS
             ∇
 
             ⍝ Write an amount of bytes to the file
