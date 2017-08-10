@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
         name='APLPy',
-        version='0.0.3.dev5',
+        version='0.0.4.dev1',
         
         description='Python - Dyalog APL bridge',
         long_description="""
@@ -39,6 +39,7 @@ This package allows communication between Python and Dyalog APL.
                 'Py.dyalog',
                 'PyTest.dyalog',
                 'WinPySlave.dyalog',
+                'IPC.dyalog',
                 'WinPySlave.dyapp'
             ]
         },
