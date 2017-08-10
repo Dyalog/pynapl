@@ -285,12 +285,12 @@
             r←(⌽∨\⌽'\'=fname)/fname
         ∇
 
-        ∇ {py} StartPython (argfmt program srvport majorVersion);pypath;arg;nonstandard
+        ∇ {py} StartPython (argfmt program inf outf majorVersion);pypath;arg;nonstandard
             :Access Public Instance                                                    
             nonstandard←0
             :If 0=≢argfmt
                 ⍝ Use default argument format: <program> <port>
-                argfmt←'"⍎" ⍠'
+                argfmt←'"⍎" → ←'
             :Else
                 nonstandard←1
             :EndIf
@@ -305,7 +305,7 @@
                 ⎕SIGNAL⊂('EN'999)('Message' 'Cannot find Python in registry.')
             :EndIf
 
-            arg←('⍎'⎕R{program})('⍠'⎕R{⍕srvport})argfmt
+            arg←('⍎'⎕R{program})('→'⎕R{inf})('←'⎕R{outf})argfmt
             :Trap 90  
 
                 pyProcess←⎕NEW Process
@@ -537,8 +537,8 @@
             ∇ RunClient (in out);rv;ok;msg;data
 
                 ⍝ bind the sockets
-                fifoIn ← ⎕NEW #.IPC.Unix.FIFO in
-                fifoOut ← ⎕NEW #.IPC.Unix.FIFO out
+                fifoIn ← ⎕NEW #.IPC.OS.FIFO in
+                fifoOut ← ⎕NEW #.IPC.OS.FIFO out
 
                 ⍝ start reading
                 fifoIn.OpenRead
@@ -669,7 +669,7 @@
                         ⍝ read five bytes to get the message header
 
                         readhdr:
-                        state header←1,⊂fifoIn.Read_ 5
+                        state header←1,⊂fifoIn.Read 5
 
                         ⍝ Don't allow interrupts while reading the body
                         tS←2503⌶1
@@ -677,7 +677,7 @@
                         len←256⊥1↓header
 
                         ⍝ read the body
-                        body←fifoIn.Read_ len
+                        body←fifoIn.Read len
 
 
                         (success mtype recv)←1 m body
@@ -921,8 +921,9 @@
                 os←⎕NEW #.Py.WindowsInterface
             :Else
                 os←⎕NEW UnixInterface
-                #.IPC.Unix.Init
-            :EndIf
+            :EndIf                   
+            
+            #.IPC.Init
 
         ∇
 
@@ -943,8 +944,8 @@
 
             ⍝ make input and output FIFOs
 
-            fifoIn ← ⎕NEW #.IPC.Unix.FIFO
-            fifoOut ← ⎕NEW #.IPC.Unix.FIFO
+            fifoIn ← ⎕NEW #.IPC.OS.FIFO
+            fifoOut ← ⎕NEW #.IPC.OS.FIFO
 
             :If debugMsg
                 ⎕←'In: ',fifoIn.Name
