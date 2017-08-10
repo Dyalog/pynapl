@@ -13,7 +13,7 @@ from __future__ import unicode_literals
 from __future__ import print_function
 
 import socket, os, time, types, signal, select, sys, json
-import tempfile
+import tempfile, platform
 from . import RunDyalog, Interrupt, WinDyalog, IPC
 from .Array import *
 from .PyEvaluator import PyEvaluator
@@ -391,23 +391,39 @@ class Connection(object):
                 return answer.to_python()
 
     @staticmethod
-    def APLClient(DEBUG=False, dyalog=None):
+    def APLClient(DEBUG=False, dyalog=None, forceTCP=False):
         """Start an APL client. This function returns an APL instance."""
         
-        # make two named pipes
-        inpipe = IPC.FIFO()
-        outpipe = IPC.FIFO()
+        # if on Windows, use TCP always
+        if os.name=='nt' or 'CYGWIN' in platform.system():
+            forceTCP=True 
+       
+        if forceTCP:
+            # use TCP 
+            inpipe = outpipe = IPC.TCPIO() # TCP connection is bidirectional
+            outarg = 'TCP'
+            inarg = str(inpipe.startServer())
+        else:    
+            # make two named pipes
+            inpipe = IPC.FIFO()
+            outpipe = IPC.FIFO()
+            inarg = inpipe.name
+            outarg = outpipe.name 
         
         if DEBUG:
-            print("in: ",inpipe.name)
-            print("out: ",outpipe.name)
+            print("in: ",inarg)
+            print("out: ",outarg)
 
         # start up Dyalog
-        if not DEBUG: RunDyalog.dystart(outpipe.name, inpipe.name, dyalog=dyalog)
+        if not DEBUG: RunDyalog.dystart(outarg, inarg, dyalog=dyalog)
 
-        # start the writer first
-        outpipe.openWrite()
-        inpipe.openRead()
+        if forceTCP:
+            # wait for Python to make the connection 
+            inpipe.acceptConnection()
+        else: 
+            # start the writer first
+            outpipe.openWrite()
+            inpipe.openRead()
 
         if DEBUG:print("Waiting for PID...")
         connobj = Connection(inpipe, outpipe, signon=False)

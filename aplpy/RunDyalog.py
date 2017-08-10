@@ -138,7 +138,8 @@ def dystart(inf, outf, dyalog=None):
         t.start()
 
     elif os.name=='nt' or 'CYGWIN' in platform.system():
-        raise NotImplemented("todo: windows pipes")
+        if inf!='TCP':
+            raise NotImplementedError('Only TCP connections are supported under Windows.')
 
         # look up dyalog in registry
         if not dyalog: 
@@ -152,9 +153,9 @@ def dystart(inf, outf, dyalog=None):
         with open(to_bytes(os.path.dirname(SCRIPTFILE))+b'/WinPort.dyalog', "wb") as f:
             f.write(to_bytes("""
                 :Namespace WinPort
-                port←%d
+                port←'%d'
                 :EndNamespace
-            """)%port)
+            """%int(outf)))
        
         #thread.start_new_thread(win_dythread, (), {"dyalog":dyalog, 
         #                    'cygwin':'CYGWIN' in platform.system()})

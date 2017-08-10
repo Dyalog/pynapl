@@ -114,7 +114,9 @@
                 :Access Public
                 
                 {}#.DRC.Close socket
-                {}#.DRC.Close srvsock   
+                :If srvsock≢⍬
+                    {}#.DRC.Close srvsock   
+                :EndIf 
                 ready←0
              ∇
 

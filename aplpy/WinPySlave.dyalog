@@ -10,7 +10,8 @@
         :ElseIf 0=⎕NC'#.WinPort'
             ⎕←'ERROR: WinPort did not load.'
         :Else 
-            #.Py.StartAPLSlave #.WinPort.port
+            ⍝ only TCP for now
+            #.Py.StartAPLSlave 'TCP' #.WinPort.port
             ⎕OFF
         :EndIf
     ∇
