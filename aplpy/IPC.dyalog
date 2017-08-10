@@ -19,7 +19,174 @@
             #.IPC.OS←#.IPC.Unix
         :EndIf             
     ∇
+              
     
+    ⍝ Use Conga
+    :Namespace TCP
+         ∇ Init  
+            ⍝ load Conga
+            :If 0=⎕NC'#.DRC'
+                'DRC'#.⎕CY'conga.dws'
+            :EndIf
+            
+            :If 0≠⊃#.DRC.Init ''
+                'Conga is unavailable.' ⎕SIGNAL 999
+            :EndIf
+                 
+         ∇       
+         
+         :Class Connection
+             :Field reading←0
+             :Field curlen←¯1
+             :Field curdata←''
+             :Field curtype←¯1
+                            
+             :Field socket←⍬
+             :Field srvsock←⍬
+                
+             :Field ready←0
+             
+             ∇n←Name
+                :Access Public
+                n←'TCP/IP'
+             ∇
+
+             ∇Connect (host port);rv
+                :Access Public
+                rv←#.DRC.Clt '' host port 'Raw'
+                :If 0=⊃rv
+                    ⍝ connection established
+                    socket←2⊃rv
+                    ready←1
+                :Else
+                    ⍝ failure
+                    'Failed to connect' ⎕SIGNAL 999
+                :EndIf
+             ∇
+             
+             ⍝Start a server
+             ∇port←StartServer;tryPort;rv
+                :Access Public
+                :For tryPort :In ⌽⍳65535
+                    rv←#.DRC.Srv '' 'localhost' tryPort 'Raw'
+                    :If 0=⊃rv
+                        port←tryPort
+                        srvsock←2⊃rv
+                        :Return
+                    :EndIf
+                :EndFor
+                
+                'Failed to start server' ⎕SIGNAL 999
+             ∇
+             
+             ⍝ Wait for a connection
+             ∇AcceptConnection;rc;rval
+                :Access Public
+                :Repeat
+                    rc←⊃rval←#.DRC.Wait srvsock
+                    :If rc=0
+                        socket←2⊃rval
+                        ready←1
+                        :Leave
+                    :ElseIf rc=100
+                        ⍝ timeout
+                        ⍞←'.'
+                        ⎕DL÷4
+                    :Else
+                        ('Failed to accept connection ',⍕rval)⎕SIGNAL 999
+                    :EndIF 
+                :EndRepeat
+             ∇
+                             
+             ∇Write data;rc
+                :Access Public
+                
+                'Inactive connection'⎕SIGNAL(~ready)/999
+                
+                rc←#.DRC.Send socket data
+                :If 0≠⊃rc    
+                    ready←0
+                    ('Socket error ',⍕rc)⎕SIGNAL 999
+                :EndIf
+             ∇     
+             
+             ∇Close
+                :Access Public
+                
+                {}#.DRC.Close socket
+                {}#.DRC.Close srvsock   
+                ready←0
+             ∇
+
+             ∇data←Read nbytes;interrupt;tS;rc;wait_ret;obj;event;sdata;r
+                :Access Public          
+                
+                'Inactive connection'⎕SIGNAL(~ready)/999 
+                
+                interrupt←0 
+
+                :Trap 1000
+                    :Repeat   
+                        :If nbytes≤≢curdata
+                            ⍝ signal interrupt if necessary
+                            :If interrupt
+                                interrupt←0
+                                'Interrupt'⎕SIGNAL 998
+                            :EndIf
+
+                            ⍝ there is enough data to return
+                            data←nbytes↑curdata
+                            curdata↓⍨←nbytes
+                            
+                            →out
+                        :Else
+                            ⍝ there is not, so go read some more
+                            
+                            :Repeat
+                                :If interrupt
+                                    interrupt←0
+                                    'Interrupt'⎕SIGNAL 998 ⍝ to match the Unix pipes
+                                :EndIf
+                                               
+                                tS←2503⌶1 ⍝ don't break while in Conga
+                                rc←⊃wait_ret←#.DRC.Wait socket
+                                {}2503⌶tS
+
+                                :If rc=0
+                                    ⍝ success
+                                    rc obj event sdata←wait_ret
+                                    :Select event
+                                    :Case 'Block' ⍝ new data
+                                        curdata ,← sdata
+                                        :Leave
+                                    :CaseList 'BlockLast' 'Error' ⍝ error
+                                        →err
+                                    :EndSelect
+                                :ElseIf rc=100
+                                    ⍝ timeout
+                                    {}⎕DL ÷4 ⍝ wait 1/4th of a second and try again
+                                :Else
+                                    ⍝ neither success nor timeout: error
+                                    →err
+                                :EndIf
+                            :EndRepeat
+                        :EndIf
+                    :EndRepeat  
+                :Else
+                    ⍝ interrupt, keep track that it happened and continue execution
+                    interrupt←1
+                    →⍎1↓(+\+⌿1 ¯1×[1]'[]'∘.=r)/r←(∧\' '≠r)/r←2⊃⎕DM
+                :EndTrap  
+                →out
+                
+                err:
+                ready←0
+                ('Socket error ',⍕wait_ret)⎕SIGNAL 999 
+                out:
+             ∇
+         :EndClass
+    :EndNamespace
+
     :Namespace Windows   
          :Section Assorted Windows constants
             GENERIC_WRITE←16⊥4 0 0 0 0 0 0 0
@@ -40,7 +207,7 @@
             ⎕NA'I  Kernel32.dll|CloseHandle P'
             ⎕NA'U4 Kernel32.dll|GetLastError' 
             ⎕NA'I  Kernel32.dll|PeekNamedPipe P =U1[] U4 >U4 >U4 >U4'  
-            ⎕NA'I  Kernel32.dll|ConnectNamedPipe P P'
+            ⎕NA'I  Kernel32.dll|ConnectNamedPipe& P P'
             ⎕NA'   Rpcrt4.dll  |UuidCreate >U1[8]'
          ∇
          

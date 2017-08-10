@@ -535,14 +535,22 @@
 
             ⍝ Run a client on a given a port
             ∇ RunClient (in out);rv;ok;msg;data
+                   
+                :If in≡'TCP'
+                    ⍝ use TCP ('out' will be the port number)
+                    #.IPC.TCP.Init
+                    fifoIn ← ⎕NEW #.IPC.TCP.Connection
+                    fifoOut ← fifoIn
+                    fifoIn.Connect 'localhost' (⍎out)
+                :Else 
+                    ⍝ bind the sockets
+                    fifoIn ← ⎕NEW #.IPC.OS.FIFO in
+                    fifoOut ← ⎕NEW #.IPC.OS.FIFO out
 
-                ⍝ bind the sockets
-                fifoIn ← ⎕NEW #.IPC.OS.FIFO in
-                fifoOut ← ⎕NEW #.IPC.OS.FIFO out
-
-                ⍝ start reading
-                fifoIn.OpenRead
-                fifoOut.OpenWrite
+                    ⍝ start reading
+                    fifoIn.OpenRead
+                    fifoOut.OpenWrite
+                :EndIf
 
                 ⍝ connection established
                 ready←1
@@ -556,27 +564,6 @@
                     :If ~ok ⋄ :Leave ⋄ :EndIf
                     msg HandleMsg data
                 :Until ~ready
-            ∇
-
-            ⍝ Find an open port and start a server on it
-            ∇ port←StartServer;tryPort;rv
-                :For tryPort :In ⌽⍳50000 ⍝ 65535
-                    rv←#.DRC.Srv '' 'localhost' tryPort 'Raw'
-                    :If 0=⊃rv
-                        port←tryPort
-                        serverSocket←2⊃rv
-
-                        ⍝ announce this so the user knows what to start
-                        :If attachToExistingPython
-                            ⎕←'Started server ',serverSocket,' on port ',port
-                            ⎕←'Waiting to connect'
-                        :EndIf
-
-                        :Return
-                    :EndIf
-                :EndFor
-
-                ⎕SIGNAL⊂('EN'BROKEN)('Message' 'Failed to start server')
             ∇
 
             ⍝ Send Unicode message
@@ -935,21 +922,35 @@
         ∇
 
         ⍝ Initialization routine
-        ∇ InitServer (startAsync argfmt);ok;tries;code;clt;success;_;msg;srvport;piducs;spath
+        ∇ InitServer (startAsync argfmt forceTCP);ok;tries;code;clt;success;_;msg;srvport;piducs;spath;if;of
             InitCommon
             signalPython←1
 
             ⍝ Attempt to start a server
             ⍝ srvport←StartServer
-
+            
+            ⍝ If we're on Windows, always use TCP
+            :If ∨/'Windows'⍷⊃#.⎕WG'APLVersion'
+                #.IPC.TCP.Init
+                forceTCP←1
+            :EndIf 
+            
             ⍝ make input and output FIFOs
-
-            fifoIn ← ⎕NEW #.IPC.OS.FIFO
-            fifoOut ← ⎕NEW #.IPC.OS.FIFO
+            :If forceTCP
+                fifoIn ← ⎕NEW #.IPC.TCP.Connection
+                fifoOut ← fifoIn ⍝ TCP connection is bidirectional
+                of←'TCP'
+                if←⍕fifoOut.StartServer  
+            :Else
+                fifoIn ← ⎕NEW #.IPC.OS.FIFO
+                fifoOut ← ⎕NEW #.IPC.OS.FIFO  
+                of←fifoOut.Name
+                if←fifoIn.Name
+            :EndIf 
 
             :If debugMsg
-                ⎕←'In: ',fifoIn.Name
-                ⎕←'Out: ',fifoOut.Name
+                ⎕←'(1) ',of
+                ⎕←'(2) ',if
             :EndIf
 
 
@@ -958,7 +959,7 @@
 
             :If ~attachToExistingPython
                 ⍝ NOTE: APL's 'out' is Python's 'in' and vice versa, of course
-                pypath os.StartPython argfmt spath fifoOut.Name fifoIn.Name majorVersion
+                pypath os.StartPython argfmt spath of if majorVersion
             :EndIf
 
             ready←1
@@ -968,8 +969,13 @@
             :EndIf
 
             ⍝ Python client should now send PID
-            fifoOut.OpenWrite
-            fifoIn.OpenRead
+            
+            :If forceTCP
+                fifoOut.AcceptConnection
+            :Else
+                fifoOut.OpenWrite
+                fifoIn.OpenRead
+            :EndIf
 
             :If debugMsg
                 ⎕←'Done.'
@@ -996,7 +1002,7 @@
 
         ⍝ param constructor 
         ⍝ this takes a (param value) vector of vectors
-        ∇ paramConstruct param;dC;par;val;clin;clout;startAsync;argfmt
+        ∇ paramConstruct param;dC;par;val;clin;clout;startAsync;argfmt;forceTCP
             :Access Public Instance
             :Implements Constructor
 
@@ -1005,7 +1011,8 @@
 
             argfmt←''
             startAsync←0
-            clin clout←'' ''
+            clin clout←'' '' 
+            forceTCP←0
             :For (par val) :In param
                 :Select par
                     ⍝ debug parameter
@@ -1020,13 +1027,14 @@
                 :Case 'Version' ⋄ majorVersion←val
                     ⍝ wait to attach to existing python
                 :Case 'Attach' ⋄ attachToExistingPython←1
-                    ⍝ start the asynchronous thread
+                    ⍝ start the asynchronous thread 
+                :Case 'ForceTCP' ⋄ forceTCP←val
                 :EndSelect
 
             :EndFor
 
             :If 0=≢clin
-                InitServer startAsync argfmt
+                InitServer startAsync argfmt forceTCP
             :Else
                 InitClient clin clout
             :EndIf

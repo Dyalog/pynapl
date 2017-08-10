@@ -8,7 +8,7 @@ from __future__ import division
 from __future__ import unicode_literals
 from __future__ import print_function
 
-import sys, os, tempfile, select, ctypes
+import sys, os, tempfile, select, ctypes, socket
 
 from subprocess import Popen, PIPE
 from ctypes import * 
@@ -167,7 +167,52 @@ class WindowsFIFO(FIFO):
     
     def __del__(self): self.close() 
     
-      
+class TCPIO(FIFO):
+    sock=None
+    sockfile=None 
+    srvsock=None 
+    
+    def connect(self,host,port):
+        # Attempt an IPV6 socket first
+        try:
+            sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+            sock.connect((host,port))
+        except:
+            # try an IPV4 socket
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((host,port))        
+        
+        self.sock = sock
+        self.sockfile = sock.makefile('rwb')
+    
+    def startServer(self):
+        self.srvsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.srvsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.srvsock.bind(('localhost', 0))
+        _, port = self.srvsock.getsockname()
+        self.srvsock.listen(1)
+        return port 
+        
+    def acceptConnection(self): 
+        self.sock, _ = self.srvsock.accept()
+        self.sockfile = self.sock.makefile('rwb') 
+        
+    def avail(self,timeout):
+        return bool(select.select([self.sock], [], [], timeout)[0])
+    
+    def read(self,amount):
+        return self.sockfile.read(amount) 
+        
+    def write(self,data):
+        return self.sockfile.write(data)
+    
+    def close(self):
+        if self.sock is None or self.sockfile is None: return
+        self.sockfile.close()
+        self.sockfile=self.sock=None 
+        
+    def flush(self):
+        self.sockfile.flush() 
         
 class UnixFIFO(FIFO):
     fileobj = None

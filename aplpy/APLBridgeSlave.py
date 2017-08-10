@@ -27,16 +27,24 @@ def runSlave(inp,outp):
     # Open the input first, then the output. APL does it in the same order
     # (i.e., it opens its output first, which is Python's input). If it is
     # done the other way around, it will block.
-    inp = IPC.FIFO(inp)
-    inp.openRead()
+    
+    if inp=='TCP':
+        # then 'outp' is a port number 
+        # connect to it
+        sock = IPC.TCPIO()
+        sock.connect('localhost', int(outp))
+        
+        conn = C.Connection(sock,sock) 
+        
+    else:
+        inp = IPC.FIFO(inp)
+        inp.openRead()
 
-    outp = IPC.FIFO(outp)
-    outp.openWrite()
+        outp = IPC.FIFO(outp)
+        outp.openWrite()
 
-    #inp = open(inp, 'rb')
-    #outp = open(outp, 'wb')
-
-    conn = C.Connection(inp,outp)
+        conn = C.Connection(inp,outp)
+    
     conn.runUntilStop()
     sys.exit(0)
 
