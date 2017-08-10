@@ -655,18 +655,17 @@
 
                 tS←2503⌶1 ⍝ no traps allowed
                 
-                state←0
                 :Trap 999
                     :Trap 998 1000 ⍝ IPC signals 998 if interrupted by the OS
                         ⍝ read five bytes to get the message header
 
                         
                         readhdr:
-                        state←0
-                        
                         ⍝ explicitly allow traps in here
                         {}2503⌶0
-                        state header←1,⊂fifoIn.Read 5
+                        header←fifoIn.Read 5
+                        
+                        readbdy:
                         {}2503⌶1
                         
                         ⍝ Don't allow interrupts while reading the body
@@ -688,8 +687,11 @@
                             os.Interrupt pid
                         :EndIf
 
-                        ⍝ if we don't have the data yet, read it
-                        →(state=0)/readhdr
+                        ⍝ if we don't have the header yet, read it
+                        →(0=⎕NC'header')/readhdr
+                        
+                        ⍝ if we don't have the body yet, read that
+                        →(0=⎕NC'body')/readbdy
                     :EndTrap
                 :Else
                     ⍝ error
