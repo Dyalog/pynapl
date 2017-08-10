@@ -660,14 +660,16 @@
                     :Trap 998 1000 ⍝ IPC signals 998 if interrupted by the OS
                         ⍝ read five bytes to get the message header
 
-                        ⍝ explicitly allow traps in here
-                        {}2503⌶0
                         
                         readhdr:
+                        state←0
+                        
+                        ⍝ explicitly allow traps in here
+                        {}2503⌶0
                         state header←1,⊂fifoIn.Read 5
-
+                        {}2503⌶1
+                        
                         ⍝ Don't allow interrupts while reading the body
-                        tS←2503⌶1
                         m←⊃header
                         len←256⊥1↓header
 
@@ -678,6 +680,8 @@
                         (success mtype recv)←1 m body
                         →out
                     :Else
+                        {}2503⌶1
+                        
                         ⍝ interrupt
                         ⍝ signal python
                         :If signalPython
