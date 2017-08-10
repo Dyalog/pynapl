@@ -596,9 +596,14 @@
             ∇
 
             ⍝ Send a message and expect a response
-            ∇ (type data)←response_type ExpectAfterSending (msgtype msgdata)
+            ∇ (type data)←response_type ExpectAfterSending (msgtype msgdata);tS
+                ⍝ we don't want interrupts in here
+                tS←2503⌶1
+                
                 msgtype USend msgdata
-                (type data)←Expect response_type 
+                (type data)←Expect response_type
+                
+                {}2503⌶tS
             ∇
 
             ⍝ Expect a message
@@ -644,17 +649,20 @@
             ∇
 
             ⍝ Receive message. Will also signal Python on interrupt, if the Python is ours
-            ⍝ If async is set, and no message is available, will return ¯1 for the success
-            ⍝ variable instead of waiting for a message.
             ⍝ Message fmt: X L L L L Data
             ∇ (success mtype recv)←Recv m;header;body;len;tS;state
                 'Inactive instance' ⎕SIGNAL BROKEN when ~ready
 
+                tS←2503⌶1 ⍝ no traps allowed
+                
                 state←0
                 :Trap 999
                     :Trap 998 1000 ⍝ IPC signals 998 if interrupted by the OS
                         ⍝ read five bytes to get the message header
 
+                        ⍝ explicitly allow traps in here
+                        {}2503⌶0
+                        
                         readhdr:
                         state header←1,⊂fifoIn.Read 5
 
@@ -668,7 +676,7 @@
 
 
                         (success mtype recv)←1 m body
-                        {}2503⌶tS
+                        →out
                     :Else
                         ⍝ interrupt
                         ⍝ signal python
@@ -683,8 +691,12 @@
                     ⍝ error
                     state←0
                     (success mtype recv)←0 0 ⍬
+                    →out
                 :EndTrap
 
+                out:
+                ⍝ restore thread state to what it was before
+                {}2503⌶tS
             ∇
         :EndSection
 
@@ -693,9 +705,10 @@
 
 
         ⍝ Handle an incoming message
-        ∇ mtype HandleMsg mdata;in;expr;args;ns;rslt;lines
+        ∇ mtype HandleMsg mdata;in;expr;args;ns;rslt;lines;tS
             :Trap 1000
-
+                {}2503⌶tS←2503⌶1 ⍝ query thread state
+                
                 :Select mtype
 
                     ⍝ 'OK' message
@@ -755,12 +768,20 @@
                         pyaplns.∆←args
                         pyaplns.py←⎕THIS 
 
+                        ⍝ we explicitly _do_ want to be able to be interrupted while exec'ing
+                        
+                        tS←2503⌶0
+                        
                         ⍝ send the result back, if no result then []
                         rslt←pyaplns.{85::⍬ ⋄ 0(85⌶)⍵}expr                   
 
+                        {}2503⌶tS
+                        
                         Msgs.EVALRET USend serialize rslt
                     :Else
+                        {}2503⌶tS
                         Msgs.ERR USend #.Py.DMXErr ⎕DMX
+                        
                     :EndTrap
 
                     ⍝ Debug serialization round trip
@@ -776,6 +797,8 @@
                 :EndSelect
 
             :Else
+                ⍝ restore thread state
+                {}2503⌶tS
                 Msgs.ERR USend #.Py.MSGErr 'Interrupt'
             :EndTrap 
         ∇
@@ -823,9 +846,13 @@
         ∇
 
         ⍝ evaluate Python code w/arguments
-        ∇ ret←{expr} Eval args;msg;mtype;recv;nargs
+        ∇ ret←{expr} Eval args;msg;mtype;recv;nargs;tS
             :Access Public
 
+            ⍝ We don't want to be interrupted, except in parts where it is explicitly
+            ⍝ allowed (called functions will 2503⌶0 in places)
+            tS←2503⌶1
+            
             ⍝ support both the " python Eval args " syntax, as the
             ⍝ "Eval python args" syntax.
             :If 0=⎕NC'expr'
@@ -850,53 +877,74 @@
 
             :If mtype=Msgs.EVALRET
                 ret←deserialize recv
-                :Return
+                →out
             :EndIf
 
             ⍝ catch error message
             :If mtype=Msgs.ERR
                 lastError←recv
                 ⎕SIGNAL⊂('EN'PYERR)('Message' recv)
-                :Return
+                →out
             :EndIf
 
+            →err
+            out:
+            {}2503⌶tS
+            :Return
+            
+            err:
             ⍝ this shouldn't happen and is an internal bug
             ('Unexpected: ',⍕mtype recv)⎕SIGNAL BUGERR
         ∇
 
         ⍝ execute Python code
-        ∇ Exec code;mtype;recv
+        ∇ Exec code;mtype;recv;tS
             :Access Public
-
+            
+            ⍝ We don't want to be interrupted, except in parts where it is explicitly
+            ⍝ allowed (called functions will 2503⌶0 in places)
+            tS←2503⌶1
+            
             mtype recv←Msgs.OK ExpectAfterSending (Msgs.EXEC code)
 
             :If mtype=Msgs.OK
-                :Return
+                →out
             :ElseIf mtype=Msgs.ERR
                 lastError←recv
                 ⎕SIGNAL⊂('EN'PYERR)('Message' recv)
-                :Return
+                →out
             :EndIf
 
+            →err
+            out:
+            {}2503⌶tS
+            :Return
+            
+            err:
             ⍝ this shouldn't happen and is an internal bug
             ('Unexpected: ',⍕mtype recv)⎕SIGNAL BUGERR
         ∇
 
         ⍝ Assign a value to a Python variable
-        ∇ var Set val;r
+        ∇ var Set val;vname;tS
             :Access Public
-            r←?1e10
-            {}'globals().update({"__temp"+str(⎕):⎕})' Eval r val
-            Exec var,'=__temp',⍕r
+            tS←2503⌶1
+            vname←'__temp',⍕?1e10
+            {}'globals().update({⎕:⎕})' Eval vname val
+            Exec var,'=',vname
+            Exec 'del ',vname
+            {}2503⌶tS
         ∇ 
 
         ⍝ Assign a value to a variable (raw)
-        ∇ var SetRaw val;r
+        ∇ var SetRaw val;vname;tS
             :Access Public
-
-            r←?1e10
-            {}'globals().update({"__temp"+str(⎕):⍞})' Eval r val
-            Exec var,'=__temp',⍕r
+            tS←2503⌶1
+            vname←'__temp',⍕?1e10
+            {}'globals().update({⎕:⎕})' Eval vname val
+            Exec var,'=',vname
+            Exec 'del ',vname
+            {}2503⌶tS
         ∇
 
         ⍝ Initialization common to the server and the client

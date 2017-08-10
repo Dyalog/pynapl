@@ -34,6 +34,20 @@ def maybe_ord(item):
     else: 
         return ord(item)
 
+# these fail when threaded, but that's OK
+def ignoreInterrupts(): 
+    try: return signal.signal(signal.SIGINT, signal.SIG_IGN)
+    except ValueError: return None # (not on main thread)
+
+def allowInterrupts():
+    try: return signal.signal(signal.SIGINT, signal.default_int_handler)
+    except ValueError: return None # pass (not on main thread)
+
+def setInterrupts(x):
+    if x==None: return None
+    try: return signal.signal(signal.SIGINT, x)
+    except ValueError: return None # pass (not on main thread)
+    
 
 class APLError(Exception): 
     def __init__(self, message="", jsobj=None):
@@ -146,16 +160,17 @@ class Message(object):
                 #ready = select.select([reader], [], [], 0.1)
                 #if not ready[0]: return None
 
+                # once we've started reading, finish reading: turn off the interrupt handler
+            try:
+                s, setsgn = signal.signal(signal.SIGINT, signal.SIG_IGN), True
+            except ValueError:
+                pass # we're not on the main thread, so no signaling at all
+
             # read the header
             try:
                 inp = reader.read(1)
 
                 mtype = maybe_ord(inp)
-                # once we've started reading, finish reading: turn off the interrupt handler
-                try:
-                    setsgn, s = True, signal.signal(signal.SIGINT, signal.SIG_IGN)
-                except ValueError:
-                    pass # we're not on the main thread, so no signaling at all
 
                 lfield = list(map(maybe_ord, reader.read(4)))
                 length = (lfield[0]<<24) + (lfield[1]<<16) + (lfield[2]<<8) + lfield[3]
@@ -451,8 +466,10 @@ class Connection(object):
         self.infile=infile
         self.outfile=outfile
         self.apl = Connection.APL(self)
+        self.isSlave = False
         if signon:
             Message(Message.PID, str(os.getpid())).send(self.outfile)
+            self.isSlave = True
 
     def runUntilStop(self, asyncHandler=None):
         """Receive messages and respond to them until STOP is received.
@@ -464,9 +481,17 @@ class Connection(object):
         if not asyncHandler is None:
             asyncHandler._setAPL(self.apl)
 
+        # we are not interruptible
+        #sig = ignoreInterrupts()
+
         while not self.stop:
+           
+            sig = ignoreInterrupts()
+
             # is there a message available?
             msg = Message.recv(self.infile, block=False)
+
+            setInterrupts(sig)
 
             if not msg is None:
                 # yes, respond to it
@@ -483,15 +508,21 @@ class Connection(object):
            handle it and go back to waiting for the right type of message."""
             
         while True: 
+            s = None
             try:
+                s = ignoreInterrupts()
                 msg = Message.recv(self.infile)
 
                 if msg.type in (msgtype, Message.ERR):
                     return msg
                 else:
+                    allowInterrupts()
                     self.respond(msg)
             except KeyboardInterrupt:
                 self.apl.interrupt()
+            finally:
+                setInterrupts(s)
+                pass
 
     def respond(self, message):
         # Add ctrl+c signal handling
@@ -530,7 +561,10 @@ class Connection(object):
 
         elif t==Message.EXEC:
             # execute some Python code in the global context
+            sig = None
             try:
+                sig = allowInterrupts()
+
                 script = message.data
                 if type(script) is bytes:
                     script = str(script, 'utf-8')
@@ -539,14 +573,17 @@ class Connection(object):
                 Message(Message.OK, '').send(self.outfile)
             except Exception as e:
                 Message(Message.ERR, repr(e)).send(self.outfile)
-
+            finally:
+                setInterrupts(sig)
 
         elif t==Message.EVAL:
             # evaluate a Python expression with optional arguments
             # expected input: APLArray, first elem = expr string, 2nd elem = arguments
             # output, if not an APLArray already, will be automagically converted
 
+            sig = None
             try:
+                sig = allowInterrupts()
                 val = APLArray.fromJSONString(message.data)
                 # unpack code
                 if val.rho != [2]: 
@@ -570,6 +607,8 @@ class Connection(object):
             except Exception as e:
                 #raise
                 Message(Message.ERR, repr(e)).send(self.outfile)
+            finally:
+                setInterrupts(sig)
 
 
         elif t==Message.DBGSerializationRoundTrip:
