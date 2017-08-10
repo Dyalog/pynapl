@@ -500,14 +500,14 @@
             ⍝ (Low-level)
             ∇ x←Read_ n;r;bytes;tS
                 :Access Public
+                retry:
                 r bytes←#.IPC.Unix.read id(n/0)n
                 tS←2503⌶1
                 :If r=¯1
                     ⍝ Something went wrong
                     :If #.IPC.Unix.geterrno=#.IPC.Unix.EINTR
-                        ⍝ We were interrupted, this is possible.
-                        ⍝ No data was received.
-                        'EINTR'⎕SIGNAL 998
+                        ⍝ retry
+                        → retry  
                     :Else
                         'Cannot read'⎕SIGNAL 999
                     :EndIf
