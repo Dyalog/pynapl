@@ -54,7 +54,7 @@ py ← ⎕NEW Py.Py('Version' 3) ⍝ use Python 3 instead of 2
 ```apl
 ⍝ start a Blender instance and control that instead of a normal Python
 ⍝ (if on Windows, you have to pass in the absolute path to blender.exe instead)
-py ← ⎕NEW Py.Py (('PyPath' 'blender') ('ArgFmt' '-P "⍎" → ← thread') ('ForceTCP' 1))
+py ← ⎕NEW Py.Py (('PyPath' 'blender') ('ArgFmt' '-P "⍎" -- → ← thread') ('ForceTCP' 1))
 ```
 
 
