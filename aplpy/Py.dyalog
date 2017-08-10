@@ -535,7 +535,7 @@
 
             ⍝ Run a client on a given a port
             ∇ RunClient (in out);rv;ok;msg;data
-                   
+
                 :If in≡'TCP'
                     ⍝ use TCP ('out' will be the port number)
                     #.IPC.TCP.Init
@@ -909,7 +909,7 @@
             :Else
                 os←⎕NEW UnixInterface
             :EndIf                   
-            
+
             #.IPC.Init
 
         ∇
@@ -928,15 +928,15 @@
 
             ⍝ Attempt to start a server
             ⍝ srvport←StartServer
-            
+
             ⍝ If we're on Windows, always use TCP
             :If ∨/'Windows'⍷⊃#.⎕WG'APLVersion'
-                #.IPC.TCP.Init
                 forceTCP←1
             :EndIf 
-            
+
             ⍝ make input and output FIFOs
             :If forceTCP
+                #.IPC.TCP.Init
                 fifoIn ← ⎕NEW #.IPC.TCP.Connection
                 fifoOut ← fifoIn ⍝ TCP connection is bidirectional
                 of←'TCP'
@@ -969,7 +969,7 @@
             :EndIf
 
             ⍝ Python client should now send PID
-            
+
             :If forceTCP
                 fifoOut.AcceptConnection
             :Else
@@ -997,7 +997,7 @@
             :Access Public Instance
             :Implements Constructor
 
-            InitServer 0 ''
+            InitServer 0 '' 0
         ∇
 
         ⍝ param constructor 
