@@ -6,7 +6,7 @@ from __future__ import division
 from __future__ import unicode_literals
 from __future__ import print_function
 
-import sys, os, threading, platform
+import sys, os, threading, platform, re
 from subprocess import Popen, PIPE
 
 # Use python 3 types in python 2
@@ -81,6 +81,24 @@ def win_dythread(dyalog, cygwin=False):
           preexec_fn=preexec_fn)
     x.communicate()
     
+
+def mac_find_dyalog():
+    # it wouldn't be the Mac if it weren't special
+
+    apls = sorted([(x.group(0), x.group(1))
+                   for x in [re.match(r'^Dyalog-(\d+(\.\d+)?)\.app$',x)
+                             for x in os.listdir('/Applications')]
+                   if x],
+                  key=lambda x: -float(x[1]))
+    
+    if not apls:
+        raise RuntimeError("Dyalog not found.")
+
+    # take the Dyalog APL with the highest version number
+    apl = apls[0]
+    apl += 'Contents/Resources/Dyalog/dyalog'
+    return apl
+
 def cygwin_find_dyalog():
     # the horrible bastard child of two operating systems
     
@@ -130,7 +148,12 @@ def windows_find_dyalog():
     
 def dystart(inf, outf, dyalog=None):
     if os.name=='posix' and not 'CYGWIN' in platform.system():
-        if not dyalog: dyalog=b"dyalog" # assume it's just on the path
+        if not dyalog: 
+            if 'Darwin' in platform.system():
+                # this is a Mac, try to find Dyalog in /Applications
+                dyalog=to_bytes(mac_find_dyalog())
+            else:
+                dyalog=b"dyalog" # assume it's just on the path, in a normal Unix installation
         
         #thread.start_new_thread(posix_dythread, (port,), {"dyalog":dyalog})
         t=threading.Thread(target=lambda:posix_dythread(inf,outf,dyalog=dyalog))
