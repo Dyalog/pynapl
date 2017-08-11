@@ -401,7 +401,13 @@
         ∇ Init
             'NonWindows'#.⎕CY'quadna.dws'
             #.NonWindows.Setup
-            libc←#.NonWindows.libc ⍬
+            ⍝ quadna.dws doesn't know where the mac C library is...
+            :If 'Mac'≡3↑#.⎕WG'APLVersion'
+                libc←'/usr/lib/system/libsystem_c.dylib'
+            :Else
+                libc←#.NonWindows.libc ⍬
+            :EndIf
+            
             ⎕NA'  ',libc,'|tmpnam =0C'
             ⎕NA'I ',libc,'|mkfifo <0C U4'
             ⎕NA'I ',libc,'|open <0C U'
