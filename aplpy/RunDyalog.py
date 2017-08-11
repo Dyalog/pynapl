@@ -95,7 +95,7 @@ def mac_find_dyalog():
         raise RuntimeError("Dyalog not found.")
 
     # take the Dyalog APL with the highest version number
-    apl = apls[0]
+    apl = apls[0][0]
     apl += 'Contents/Resources/Dyalog/dyalog'
     return apl
 
