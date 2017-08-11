@@ -96,7 +96,7 @@ def mac_find_dyalog():
 
     # take the Dyalog APL with the highest version number
     apl = apls[0][0]
-    apl += '/Contents/Resources/Dyalog/dyalog'
+    apl = '/Applications/'+apl+'/Contents/Resources/Dyalog/dyalog'
     return apl
 
 def cygwin_find_dyalog():
