@@ -43,6 +43,7 @@ class, namely:
 | `ArgFmt` | string, where `⍎` will be replaced by the path to the slave script, `→` by the input pipe file (or `TCP` if in TCP mode), and `←` by the output pipe file (or port number if in TCP mode) | When used in combination with `PyPath`, use a custom argument format rather than the standard one. |
 | `Version` | major Python version (2 or 3) | Start either a Python 2 or 3 interpreter, depending on which is given. The default is currently 2. |
 | `Debug` | boolean | If the boolean is 1, turns on debug messages and also does not start up a Python instance. |
+| `NoInterrupts` | boolean | Turns off interrupts in the bridge code. This disables the ability to interrupt running Python code, but makes sure that any interrupts are caught by your own code and not by the bridge. |
 
 
 In particular, the following might be of interest:
