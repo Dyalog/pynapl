@@ -7,13 +7,17 @@
 
 
 
-    ∇Init
+    ∇Init;isOS
+        
+        isOS←{⍵≡(≢⍵)↑⊃#.⎕WG'APLVersion'}
+        
         ⍝ Figure out which OS we're on and select the correct IPC class
-        :If 'Windows'≡7↑⊃#.⎕WG'APLVersion'
+        :If isOS 'Windows'
             ⍝ In a world without walls, who needs Windows and Gates?
             #.IPC.Windows.Init
             #.IPC.OS←#.IPC.Windows
-        :ElseIf 'Linux'≡5↑⊃#.⎕WG'APLVersion'  
+        :ElseIf isOS 'Linux'
+        :OrIf isOS 'Mac'
             ⍝ WE HAVE A GREAT OPERATING SYSTEM, FOLKS, THE BEST
             #.IPC.Unix.Init
             #.IPC.OS←#.IPC.Unix
