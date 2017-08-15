@@ -3,6 +3,11 @@
 This is a bridge between Dyalog APL and Python. It allows Python
 code to be accessed from APL, and vice versa.
 
+#### Requirements:
+
+ - Dyalog APL version 16.0 Unicode
+ - Python 2.7.9 or higher, or Python 3.4 or higher.
+
 ## User manual
 
 ### Accessing Python from APL
