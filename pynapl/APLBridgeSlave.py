@@ -18,8 +18,8 @@ import threading
 mypath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.insert(1,mypath)
 
-from aplpy import APLPyConnect as C
-from aplpy import IPC
+from pynapl import APLPyConnect as C
+from pynapl import IPC
 
 def runSlave(inp,outp):
     print("Opening input file...")

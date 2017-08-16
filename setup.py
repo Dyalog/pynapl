@@ -1,10 +1,10 @@
 from setuptools import setup
 
 setup(
-        name='APLPy',
+        name="Py'n'APL",
         version='0.0.4.dev1',
         
-        description='Python - Dyalog APL bridge',
+        description='Python - Dyalog APL interface',
         long_description="""
 This package allows communication between Python and Dyalog APL.
 """,
@@ -30,12 +30,12 @@ This package allows communication between Python and Dyalog APL.
             'Programming Language :: Python :: 3.6',
         ],
 
-        keywords='apl dyalog-apl bridge',
+        keywords='apl dyalog-apl interface',
 
-        packages=['aplpy'],
+        packages=['pynapl'],
 
         package_data={
-            'aplpy': [
+            'pynapl': [
                 'Py.dyalog',
                 'PyTest.dyalog',
                 'WinPySlave.dyalog',

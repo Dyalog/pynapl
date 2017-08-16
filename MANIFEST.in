@@ -1,5 +1,5 @@
-include aplpy/Py.dyalog
-include aplpy/PyTest.dyalog
-include aplpy/WinPySlave.dyalog
-include aplpy/WinPySlave.dyapp
-include aplpy/IPC.dyalog
+include pynapl/Py.dyalog
+include pynapl/PyTest.dyalog
+include pynapl/WinPySlave.dyalog
+include pynapl/WinPySlave.dyapp
+include pynapl/IPC.dyalog

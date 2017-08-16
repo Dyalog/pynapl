@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""Dyalog APL <> Python bridge"""
+"""Dyalog APL <> Python interface"""
 
 from __future__ import absolute_import
 from __future__ import division

@@ -1,6 +1,6 @@
-# APL-Python bridge
+# Py'n'APL: APL-Python interface
 
-This is a bridge between Dyalog APL and Python. It allows Python
+This is an interface between Dyalog APL and Python. It allows Python
 code to be accessed from APL, and vice versa.
 
 #### Requirements:
@@ -12,7 +12,7 @@ code to be accessed from APL, and vice versa.
 
 ### Accessing Python from APL
 
-The APL side of the bridge is located in `Py.dyalog`. 
+The APL side of the interface is located in `Py.dyalog`. 
 It can be loaded into the workspace using:
 
 ```apl
@@ -48,7 +48,7 @@ class, namely:
 | `ArgFmt` | string, where `⍎` will be replaced by the path to the slave script, `→` by the input pipe file (or `TCP` if in TCP mode), and `←` by the output pipe file (or port number if in TCP mode) | When used in combination with `PyPath`, use a custom argument format rather than the standard one. |
 | `Version` | major Python version (2 or 3) | Start either a Python 2 or 3 interpreter, depending on which is given. The default is currently 2. |
 | `Debug` | boolean | If the boolean is 1, turns on debug messages and also does not start up a Python instance. |
-| `NoInterrupts` | boolean | Turns off interrupts in the bridge code. This disables the ability to interrupt running Python code, but makes sure that any interrupts are caught by your own code and not by the bridge. |
+| `NoInterrupts` | boolean | Turns off interrupts in the interface code. This disables the ability to interrupt running Python code, but makes sure that any interrupts are caught by your own code and not by the interface. |
 
 
 In particular, the following might be of interest:
@@ -173,7 +173,7 @@ showPage 'http://www.dyalog.com'
 
 #### Error handling
 
-If the Python code raises an exception, the bridge will signal a
+If the Python code raises an exception, the interface will signal a
 DOMAIN ERROR. `⎕DMX.Message` will contain the string representation
 of the Python exception. 
 
@@ -189,7 +189,7 @@ An APL object can be obtained using the `APL.APL` function. This
 will start a Dyalog instance in the background and connect to it.
 
 ```python
-from aplpy import APL
+from pynapl import APL
 apl = APL.APL()
 ```
 
