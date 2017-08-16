@@ -419,7 +419,7 @@ class Connection(object):
             if 'raw' in kwargs and kwargs['raw']:
                 return answer
             else:
-                return answer.to_python()
+                return answer.to_python(self.store)
 
     @staticmethod
     def APLClient(DEBUG=False, dyalog=None, forceTCP=False):
@@ -608,7 +608,7 @@ class Connection(object):
                 if not isinstance(val[[0]], APLArray):
                     raise MalformedMessage("First argument must contain code string.")
 
-                code = val[[0]].to_python()
+                code = val[[0]].to_python(self.apl.store)
                 if not type(code) in (str,bytes):
                     raise MalformedMessage("Code element must be a string, but got: %s" % repr(code))
 

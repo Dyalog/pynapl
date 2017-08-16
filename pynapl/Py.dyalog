@@ -160,6 +160,12 @@
 
             :If 0=⎕NC'taboo' ⋄ taboo←⍬ ⋄ :EndIf
 
+            ⍝ if this is an object that supports its own encoding, use that
+            :If 0≠⎕NC⊂'obj.⍙encode'
+                r←obj.⍙encode
+                :Return
+            :EndIf
+
             :If ~(⎕NC⊂'obj')∊2.1 2.2 9.1
                 ⎕SIGNAL⊂('EN' 6)('Message' 'Only values and namespaces containing values can be serialized.')
             :EndIf
@@ -463,10 +469,17 @@
             r←⍙id
         ∇
 
+        ∇r←⍙encode
+            :Access Public
+            ⍝ return the reference ID to Python
+            r←⎕NS''
+            r.rid←⍙id
+        ∇
+
         ⍝⍝ Make a python instance
         ∇z←⍙MkInst (pyclass ns);cls;clstxt;va;fn;clns
             :Access Public Shared
-            
+
             clstxt← ⊂':Class ',ns.cls,' : #.Py.⍙PythonObject'
 
             ⍝ add a constructor
@@ -477,6 +490,7 @@
 
             ⍝ add in properties for all the variables
             :For va :In ns.va
+                :If '.'∊va ⋄ :Continue ⋄ :EndIf
                 clstxt,←⊂ ':Property ',va
                 clstxt,←⊂ ':Access Public'
                 clstxt,←⊂ '∇ r←get'
@@ -486,15 +500,31 @@
                 clstxt,←⊂ '  ''',va,''' ⍙Set v.NewValue'
                 clstxt,←⊂ '∇'
                 clstxt,←⊂ ':EndProperty'
+
+                clstxt,←⊂ ':Property ∆',va
+                clstxt,←⊂ ':Access Public'
+                clstxt,←⊂ '∇ r←get'
+                clstxt,←⊂ '  r←⍙Get∆ ''',va,''''
+                clstxt,←⊂ '∇'
+                clstxt,←⊂ ':EndProperty'
             :EndFor
 
             ⍝ add in functions for all the functions
             :For fn :In ns.fn
+                :If '.'∊fn ⋄ :Continue ⋄ :EndIf
+                
                 clstxt,←⊂ '∇{z}←{kwargs} ',fn,' args'
                 clstxt,←⊂ '  :Access Public'
                 clstxt,←⊂ '  :If 0=⎕NC''kwargs'' ⋄ kwargs←⍬ ⋄ :EndIf'
                 clstxt,←⊂ '  args←,args'
                 clstxt,←⊂ '  z←''',fn,''' ⍙Call args kwargs'
+                clstxt,←⊂ '∇'
+
+                clstxt,←⊂ '∇{z}←{kwargs} ∆',fn,' args'
+                clstxt,←⊂ '  :Access Public'
+                clstxt,←⊂ '  :If 0=⎕NC''kwargs'' ⋄ kwargs←⍬ ⋄ :EndIf'
+                clstxt,←⊂ '  args←,args'
+                clstxt,←⊂ '  z←''',fn,''' ⍙Call∆ args kwargs'
                 clstxt,←⊂ '∇'
             :EndFor
 
@@ -524,6 +554,13 @@
             z←'getattr(APL._access(⎕),⎕)' ⍙py.Eval ⍙id var
         ∇
 
+        ⍝ Access Values
+        ∇z←⍙Get∆ var
+            :Access Public
+            z←'APL.obj(getattr(APL._access(⎕),⎕))' ⍙py.Eval ⍙id var
+        ∇
+
+
         ∇var ⍙Set val
             :Access Public
             {} 'setattr(APL._access(⎕),⎕,⎕)' ⍙py.Eval ⍙id var val
@@ -543,6 +580,17 @@
             :EndIf
 
             z←'getattr(APL._access(⎕),⎕)(*⎕,**⎕)' ⍙py.Eval ⍙id fname args kwargs
+        ∇
+
+        ⍝ Call Functions
+        ∇{z}←fname ⍙Call∆ (args kwargs)
+            :Access Public
+
+            :If 9≠⎕NC'kwargs'
+                kwargs←#.Py.MkNS kwargs
+            :EndIf
+
+            z←'APL.obj(getattr(APL._access(⎕),⎕)(*⎕,**⎕))' ⍙py.Eval ⍙id fname args kwargs
         ∇
 
     :EndClass
@@ -961,6 +1009,12 @@
             str←recv
         ∇
 
+        ⍝ Import a Python module and return it as an APL object
+        ∇ {obj}←Import module
+            :Access Public
+            Exec'import ',module
+            obj←Eval module
+        ∇
 
         ⍝ expose a Python function as a monadic APL "function" (using a namespace)
         ⍝ the argument is *args. The optional left argument is a boolean vector

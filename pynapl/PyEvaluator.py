@@ -90,9 +90,11 @@ class PyEvaluator(object):
             if ch in u'⎕⍞':
                 build.append(u'args[%d]' % narg)
                 curarg = self.args[[narg]]
-                if ch==u'⎕' and (isinstance(curarg,APLArray) or isinstance(curarg,APLNamespace)):
+                if ch==u'⎕' and (isinstance(curarg,APLArray) 
+                              or isinstance(curarg,APLNamespace)
+                              or isinstance(curarg,ObjectRef)):
                     # this argument should be converted to a suitable Python representation
-                    self.pyargs.append(curarg.to_python())
+                    self.pyargs.append(curarg.to_python(self.conn.apl.store))
                 else:
                     self.pyargs.append(curarg)
                     
@@ -115,7 +117,7 @@ class PyEvaluator(object):
         exec(self.wrapper, globals(), local)
         retval = local['retval']
         if not isinstance(retval, APLArray):
-            retval = APLArray.from_python(retval, False, self.conn.apl.store)
+            retval = APLArray.from_python(retval, True, self.conn.apl.store)
 
         return retval 
 

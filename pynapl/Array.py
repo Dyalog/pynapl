@@ -18,7 +18,7 @@ except:
     NUMPY_SUPPORT = False
 
 from .Util import *
-from .ObjectWrapper import ObjectWrapper, ObjectStore
+from .ObjectWrapper import ObjectWrapper, ObjectStore, ObjectRef
 
 # in Python 3, the distinction between "long" and "int" doesn't exist
 # anymore
@@ -46,13 +46,14 @@ class APLNamespace(object):
         return json.dumps(self, cls=ArrayEncoder, ensure_ascii=False)
 
     # convert an APL namespace to a Python dictionary
-    def to_python(self):
+    def to_python(self,objstore=None):
         newdct = {}
         for x in self.dct:
             obj = self.dct[x]
             if isinstance(obj, APLArray) \
-            or isinstance(obj, APLNamespace):
-                newdct[x] = obj.to_python()
+            or isinstance(obj, APLNamespace) \
+            or isinstance(obj, ObjectRef):
+                newdct[x] = obj.to_python(objstore)
             else:
                 newdct[x] = obj
         return newdct
@@ -98,6 +99,9 @@ class APLArray(object):
             elif 'ns' in jsobj:
                 # this is an APL namespace, which can be represented as a dict in Python
                 return APLNamespace(jsobj['ns'])
+            elif 'rid' in jsobj:
+                # this is a reference to a Python object sent over APL
+                return ObjectRef(jsobj['rid'])
             elif 'imag' in jsobj:
                 # this is a complex number
                 return complex(jsobj['real'], jsobj['imag'])
@@ -111,7 +115,7 @@ class APLArray(object):
 
 
     # convert array to suitable-ish python representation
-    def to_python(self):
+    def to_python(self, store=None):
         """Convert an APLArray to a Python object.
 
         Multidimensional arrays will be split up row-by-row and returned as a nested list, 
@@ -119,8 +123,9 @@ class APLArray(object):
 
         if len(self.rho)==0: # scalar
             scalar = self.data[0]
-            if isinstance(scalar, APLArray): return scalar.to_python()
-            elif isinstance(scalar, APLNamespace): return scalar.to_python()
+            if isinstance(scalar, APLArray): return scalar.to_python(store)
+            elif isinstance(scalar, APLNamespace): return scalar.to_python(store)
+            elif isinstance(scalar, ObjectRef): return scalar.to_python(store)
             else: return scalar
 
         elif len(self.rho)==1: # array
@@ -135,8 +140,10 @@ class APLArray(object):
             else:
                 pylist = []
                 for item in self.data:
-                    if isinstance(item,APLArray) or isinstance(item,APLNamespace): 
-                        item=item.to_python()
+                    if isinstance(item,APLArray) \
+                    or isinstance(item,APLNamespace) \
+                    or isinstance(item,ObjectRef):
+                        item=item.to_python(store)
                     
                     pylist.append(item)
                 return pylist
@@ -147,7 +154,7 @@ class APLArray(object):
             # nocopy is safe here because arr is never modified
             while len(arr.rho)>0: arr=arr.split(nocopy=True)
             # convert the flattened array to a python representation
-            return arr.to_python()
+            return arr.to_python(store)
 
         raise RuntimeError("rho < 0; rho=%d!" % self.rho)
 

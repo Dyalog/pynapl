@@ -41,7 +41,7 @@ class ObjectStore(object):
         """Return a reference to an object, if we have it."""
         ref = str(ref)
         if not ref in self.objects:
-            raise ValueError("No object with reference: %d"%ref)
+            raise ValueError("No object with reference: %s"%ref)
         obj, refcount = self.objects[ref]
         return obj
 
@@ -49,7 +49,7 @@ class ObjectStore(object):
         """Release an object, given a reference."""
         ref = str(ref)
         if not ref in self.objects:
-            raise ValueError("No object with reference: %d"%ref)
+            raise ValueError("No object with reference: %s"%ref)
 
         obj, refcount = self.objects[ref]
         if refcount<=1:
@@ -91,7 +91,16 @@ class ObjectWrapper(object):
 
     def toJSONString(self):
         return json.dumps(self, cls=WrappedObjectEncoder, ensure_ascii=False)
- 
+
+# only holds a reference, but can be used to retrieve the actual object
+class ObjectRef(object):
+    def __init__(self, ref):
+        self.ref = ref
+
+    # to match the Array function.
+    def to_python(self, store):
+        return store.retrieve(self.ref)
+
 class WrappedObjectEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, ObjectWrapper):
