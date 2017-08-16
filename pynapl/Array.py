@@ -10,6 +10,7 @@ import json
 import codecs
 import collections
 
+
 try:
     import numpy as np
     NUMPY_SUPPORT = True
@@ -17,6 +18,7 @@ except:
     NUMPY_SUPPORT = False
 
 from .Util import *
+from .ObjectWrapper import ObjectWrapper, ObjectStore
 
 # in Python 3, the distinction between "long" and "int" doesn't exist
 # anymore
@@ -151,7 +153,7 @@ class APLArray(object):
 
 
     @staticmethod
-    def from_python(obj, enclose=True):
+    def from_python(obj, enclose=True, objectstore=None):
         """Create an APLArray from a Python object.
         
         Objects may be numbers, strings, or lists.
@@ -172,12 +174,12 @@ class APLArray(object):
                 for i in range(rank-1):
                     l = sum(l, [])
                 
-                l = [APLArray.from_python(x,False) for x in l]
+                l = [APLArray.from_python(x,False,objectstore) for x in l]
                 return APLArray(rho=shape, data=l)
 
-
         if isinstance(obj, APLArray) \
-        or isinstance(obj, APLNamespace):
+        or isinstance(obj, APLNamespace) \
+        or isinstance(obj, ObjectWrapper):
             return obj # it already is of the right type
 
         if type(obj) is dict:
@@ -187,7 +189,7 @@ class APLArray(object):
         # lists, tuples and strings can be represented as vectors
         if type(obj) in (list,tuple):
             return APLArray(rho=[len(obj)], 
-                            data=[APLArray.from_python(x,enclose=False) for x in obj])
+                            data=[APLArray.from_python(x,False,objectstore) for x in obj])
         
         # numbers can be represented as numbers, enclosed if at the upper level so we always send an 'array'
         elif type(obj) in (int,long,float,complex): 
@@ -204,18 +206,18 @@ class APLArray(object):
                 if enclose: return APLArray(rho=[], data=[obj], type_hint=APLArray.TYPE_HINT_CHAR)
                 else: return obj
             else:
-                aplstr = APLArray.from_python(list(obj))
+                aplstr = APLArray.from_python(list(obj),False,objectstore)
                 aplstr.type_hint = APLArray.TYPE_HINT_CHAR
                 return aplstr
 
         elif type(obj) is bytes:
             # a non-unicode string will be encoded as UTF-8
-            return APLArray.from_python(str(obj, "utf8"))
+            return APLArray.from_python(str(obj, "utf8"),False,objectstore)
 
         # if the object is iterable, but not one of the above, try making a list out of it
         if isinstance(obj, collections.Iterable) \
         or hasattr(obj, '__iter__'):
-            return APLArray.from_python(list(obj))
+            return APLArray.from_python(list(obj),False,objectstore)
 
         # last ditch resort: if the object implements __len__ and __getitem__,
         # we can iterate over it and get the objects that way
@@ -223,15 +225,19 @@ class APLArray(object):
             try:
                 ls = []
                 for idx in range(len(obj)): ls.append(obj[idx])
-                return APLArray.from_python(ls)
+                return APLArray.from_python(ls,False,objectstore)
             except:
                 # if an exception occurs while trying this, let's just report that
                 # we don't support it.
                 raise TypeError("type not supported: " + repr(type(obj)))
 
 
-        # nothing else is supported for now
-        raise TypeError("type not supported: " + repr(type(obj)))
+        if not objectstore is None:
+            # Wrap the object, store it, send a reference
+            return ObjectWrapper(objectstore, obj)
+        else:
+            # Nope
+            raise TypeError("type not supported: " + repr(type(obj)))
 
     def copy(self):
         """Return an independent deep copy of the array."""
@@ -351,6 +357,9 @@ class ArrayEncoder(json.JSONEncoder):
             return {"r": obj.rho, "d": obj.data, "t":obj.genTypeHint()}
         elif isinstance(obj, APLNamespace):
             return {"ns": obj.dct}
+        #elif isinstance(obj, ObjectWrapper):
+        #    cls, va, fn = obj.items()
+        #    return {"id": obj.ref(), "cls": cls, "va": va, "fn": fn}
         elif isinstance(obj, complex):
             return {"real": obj.real, "imag": obj.imag}
         else:

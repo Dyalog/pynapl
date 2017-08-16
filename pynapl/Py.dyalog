@@ -17,6 +17,14 @@
     :EndSection
 
 
+    ⍝ Make a namespace out of ('name' value) pairs
+    ∇r←MkNS pairs;name;value
+        r←⎕NS''
+        :For (name value) :In pairs
+            name r.{⍎⍺,'←⍵'} value
+        :EndFor
+    ∇
+
     ⍝ Retrieve the path from the namespace
     ∇r←ScriptPath
         ⍝r←SALT_Data.SourceFile
@@ -54,12 +62,12 @@
     :Class JSONSerializer
 
         ⍝ deserialize
-        ∇ r←deserialize json
+        ∇ r←pyclass deserialize json
             :Access Public Shared
-            r←decode ⎕JSON json
+            r←pyclass decode ⎕JSON json
         ∇
 
-        ∇ r←decode obj
+        ∇ r←pyclass decode obj
             :Access Public Shared
 
             :If 9.1≠⎕NC⊂'obj'
@@ -70,7 +78,13 @@
 
             :If 0≠⎕NC'obj.ns'
                 ⍝ an encoded namespace
-                r←decodeNS obj.ns
+                r←pyclass decodeNS obj.ns
+                :Return
+            :EndIf
+
+            :If 0≠⎕NC'obj.id'
+                ⍝ a Python object wrapper
+                r←pyclass decodeOW obj
                 :Return
             :EndIf
 
@@ -94,17 +108,21 @@
                 :EndIf
             :Else
                 ⍝ otherwise, reconstruct the array as given
-                r←obj.r⍴decode¨⊃¨obj.d
+                r←obj.r⍴(pyclass∘decode)¨⊃¨obj.d
             :EndIf
         ∇
 
-        ∇ r←decodeNS ns;child;children;dec
+        ∇ r←pyclass decodeOW ns
+            r←⍙PythonObject.⍙MkInst (pyclass ns)
+        ∇   
+
+        ∇ r←pyclass decodeNS ns;child;children;dec
             r←⎕NS''
 
             children←ns.⎕NL-2 9
 
             :For child :In children
-                dec←decode ns.⍎child
+                dec←pyclass decode ns.⍎child
                 child r.{⍎⍺,'←⍵'}dec
             :EndFor
         ∇
@@ -413,6 +431,122 @@
 
     :EndClass
 
+
+    ⍝ This class can represent a Python object
+    ⍝ 'Py' will make instances of these, using which you can represent
+    ⍝ the Python object.
+
+    ⍝ (All the names start with ⍙ since that doesn't occur in Python)
+    :Class ⍙PythonObject
+        :Field Private ⍙id
+        :Field Private ⍙va
+        :Field Private ⍙fn
+        :Field Private ⍙py
+
+        ∇⍙dont_do_this
+            :Access Public
+            :Implements Constructor
+            ⎕SIGNAL⊂('EN'11)('Cannot instantiate Python class from APL.')
+        ∇
+
+        ∇⍙init(pyclass ns)
+            :Access Public
+            :Implements Constructor
+            ⍙id←ns.id
+            ⍙va←ns.va
+            ⍙fn←ns.fn
+            ⍙py←pyclass
+        ∇
+
+        ∇r←⍙Ref
+            :Access public
+            r←⍙id
+        ∇
+
+        ⍝⍝ Make a python instance
+        ∇z←⍙MkInst (pyclass ns);cls;clstxt;va;fn;clns
+            :Access Public Shared
+            
+            clstxt← ⊂':Class ',ns.cls,' : #.Py.⍙PythonObject'
+
+            ⍝ add a constructor
+            clstxt,←⊂ '∇ ⍙init(pyclass ns)'
+            clstxt,←⊂ '  :Access Public'
+            clstxt,←⊂ '  :Implements Constructor :Base (pyclass ns)'
+            clstxt,←⊂ '∇'
+
+            ⍝ add in properties for all the variables
+            :For va :In ns.va
+                clstxt,←⊂ ':Property ',va
+                clstxt,←⊂ ':Access Public'
+                clstxt,←⊂ '∇ r←get'
+                clstxt,←⊂ '  r←⍙Get ''',va,''''
+                clstxt,←⊂ '∇'
+                clstxt,←⊂ '∇ set v'
+                clstxt,←⊂ '  ''',va,''' ⍙Set v.NewValue'
+                clstxt,←⊂ '∇'
+                clstxt,←⊂ ':EndProperty'
+            :EndFor
+
+            ⍝ add in functions for all the functions
+            :For fn :In ns.fn
+                clstxt,←⊂ '∇{z}←{kwargs} ',fn,' args'
+                clstxt,←⊂ '  :Access Public'
+                clstxt,←⊂ '  :If 0=⎕NC''kwargs'' ⋄ kwargs←⍬ ⋄ :EndIf'
+                clstxt,←⊂ '  args←,args'
+                clstxt,←⊂ '  z←''',fn,''' ⍙Call args kwargs'
+                clstxt,←⊂ '∇'
+            :EndFor
+
+            clstxt,←⊂':EndClass'
+
+            clns←⎕NS'' 
+            ⍝ fix the class
+            cls←clns.⎕FIX clstxt
+
+            ⍝ instantiate it
+            z←⎕NEW cls (pyclass ns)
+        ∇
+
+        ∇⍙destroy
+            :Access Private
+            :Implements Destructor
+            ⍝ at least _try_ to tell Python to decrease the refcount,
+            ⍝ but don't crash the whole thing if it doesn't work for some reason
+            :Trap 0
+                {}'APL._release(⎕)' ⍙py.Eval ⊂⍙id
+            :EndTrap
+        ∇
+
+        ⍝ Access Values
+        ∇z←⍙Get var
+            :Access Public
+            z←'getattr(APL._access(⎕),⎕)' ⍙py.Eval ⍙id var
+        ∇
+
+        ∇var ⍙Set val
+            :Access Public
+            {} 'setattr(APL._access(⎕),⎕,⎕)' ⍙py.Eval ⍙id var val
+        ∇
+
+        ∇var ⍙SetRaw val
+            :Access Public
+            {} 'setattr(APL._access(⎕),⎕,⍞)' ⍙py.Eval ⍙id var val
+        ∇    
+
+        ⍝ Call Functions
+        ∇{z}←fname ⍙Call (args kwargs)
+            :Access Public
+
+            :If 9≠⎕NC'kwargs'
+                kwargs←#.Py.MkNS kwargs
+            :EndIf
+
+            z←'getattr(APL._access(⎕),⎕)(*⎕,**⎕)' ⍙py.Eval ⍙id fname args kwargs
+        ∇
+
+    :EndClass
+
     ⍝ Connect to 
     :Class Py
 
@@ -469,7 +603,7 @@
 
         ⍝ This is set to 1 if this is our Python (so we need to signal it)
         :Field Private signalPython←0
-        
+
         ⍝ This field can be set to 0 to disallow interrupts completely
         :Field Private noInterrupts←0
 
@@ -486,7 +620,8 @@
             serialize←{#.Py.JSONSerializer.serialize ⍵}
 
             ⍝ Deserialize a (possibly nested) array
-            deserialize←{#.Py.JSONSerializer.deserialize ⍵}
+            ⍝ Pass along an instance of the class so we can pass _that_ along to Python object wrappers
+            deserialize←{⎕THIS #.Py.JSONSerializer.deserialize ⍵}
 
             :Section JSON serialization debug code
                 ⍝ Send an array through the serialization code on both sides
@@ -602,10 +737,10 @@
             ∇ (type data)←response_type ExpectAfterSending (msgtype msgdata);tS
                 ⍝ we don't want interrupts in here
                 tS←2503⌶1
-                
+
                 msgtype USend msgdata
                 (type data)←Expect response_type
-                
+
                 {}2503⌶tS
             ∇
 
@@ -657,20 +792,20 @@
                 'Inactive instance' ⎕SIGNAL BROKEN when ~ready
 
                 tS←2503⌶1 ⍝ no traps allowed
-                
+
                 :Trap 999
                     :Trap 998 1000 ⍝ IPC signals 998 if interrupted by the OS
                         ⍝ read five bytes to get the message header
 
-                        
+
                         readhdr:
                         ⍝ explicitly allow traps in here unless they are turne doff
                         {}2503⌶noInterrupts
                         header←fifoIn.Read 5
-                        
+
                         readbdy:
                         {}2503⌶1
-                        
+
                         ⍝ Don't allow interrupts while reading the body
                         m←⊃header
                         len←256⊥1↓header
@@ -683,7 +818,7 @@
                         →out
                     :Else
                         {}2503⌶1
-                        
+
                         ⍝ interrupt
                         ⍝ signal python
                         :If signalPython
@@ -692,7 +827,7 @@
 
                         ⍝ if we don't have the header yet, read it
                         →(0=⎕NC'header')/readhdr
-                        
+
                         ⍝ if we don't have the body yet, read that
                         →(0=⎕NC'body')/readbdy
                     :EndTrap
@@ -717,7 +852,7 @@
         ∇ mtype HandleMsg mdata;in;expr;args;ns;rslt;lines;tS
             :Trap 1000
                 {}2503⌶tS←2503⌶1 ⍝ query thread state
-                
+
                 :Select mtype
 
                     ⍝ 'OK' message
@@ -778,19 +913,19 @@
                         pyaplns.py←⎕THIS 
 
                         ⍝ we explicitly _do_ want to be able to be interrupted while exec'ing
-                        
+
                         tS←2503⌶noInterrupts
-                        
+
                         ⍝ send the result back, if no result then []
                         rslt←pyaplns.{85::⍬ ⋄ 0(85⌶)⍵}expr                   
 
                         {}2503⌶tS
-                        
+
                         Msgs.EVALRET USend serialize rslt
                     :Else
                         {}2503⌶tS
                         Msgs.ERR USend #.Py.DMXErr ⎕DMX
-                        
+
                     :EndTrap
 
                     ⍝ Debug serialization round trip
@@ -861,7 +996,7 @@
             ⍝ We don't want to be interrupted, except in parts where it is explicitly
             ⍝ allowed (called functions will 2503⌶0 in places)
             tS←2503⌶1
-            
+
             ⍝ support both the " python Eval args " syntax, as the
             ⍝ "Eval python args" syntax.
             :If 0=⎕NC'expr'
@@ -900,7 +1035,7 @@
             out:
             {}2503⌶tS
             :Return
-            
+
             err:
             ⍝ this shouldn't happen and is an internal bug
             ('Unexpected: ',⍕mtype recv)⎕SIGNAL BUGERR
@@ -909,11 +1044,11 @@
         ⍝ execute Python code
         ∇ Exec code;mtype;recv;tS
             :Access Public
-            
+
             ⍝ We don't want to be interrupted, except in parts where it is explicitly
             ⍝ allowed (called functions will 2503⌶0 in places)
             tS←2503⌶1
-            
+
             mtype recv←Msgs.OK ExpectAfterSending (Msgs.EXEC code)
 
             :If mtype=Msgs.OK
@@ -928,7 +1063,7 @@
             out:
             {}2503⌶tS
             :Return
-            
+
             err:
             ⍝ this shouldn't happen and is an internal bug
             ('Unexpected: ',⍕mtype recv)⎕SIGNAL BUGERR

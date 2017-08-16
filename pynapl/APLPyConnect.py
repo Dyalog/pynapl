@@ -17,6 +17,7 @@ import tempfile, platform
 from . import RunDyalog, Interrupt, WinDyalog, IPC
 from .Array import *
 from .PyEvaluator import PyEvaluator
+from .ObjectWrapper import *
 
 # in Python 2, set string types to be their Python 3 equivalents
 if sys.version_info.major == 2:
@@ -201,13 +202,28 @@ class Connection(object):
     #pid=None
 
     class APL(object):
+        """Represents the APL interpreter."""
+
         pid=None
         DEBUG=False
+        store=None
 
-        """Represents the APL interpreter."""
         def __init__(self, conn):
+            self.store = ObjectStore()
             self.conn=conn
             self.ops=0 # keeps track of how many operators have been defined
+
+        def obj(self, obj):
+            """Wrap an object so it can be sent to APL."""
+            return ObjectWrapper(self.store, obj) 
+   
+        def _access(self, ref):
+            """Called by the APL side to access a Python object"""
+            return self.store.retrieve(ref)
+
+        def _release(self, ref):
+            """Called by the APL side to release an object it has sent."""
+            self.store.release(ref)
 
         def stop(self):
             """If the connection was initiated from the Python side, this will close it."""
@@ -390,7 +406,7 @@ class Connection(object):
 
             # print "evaluating: ", aplexpr
 
-            payload = APLArray.from_python([aplexpr, args]).toJSONString()
+            payload = APLArray.from_python([aplexpr, args], self.store).toJSONString()
             Message(Message.EVAL, payload).send(self.conn.outfile)
 
             reply = self.conn.expect(Message.EVALRET)

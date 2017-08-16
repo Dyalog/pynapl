@@ -115,7 +115,7 @@ class PyEvaluator(object):
         exec(self.wrapper, globals(), local)
         retval = local['retval']
         if not isinstance(retval, APLArray):
-            retval = APLArray.from_python(retval)
+            retval = APLArray.from_python(retval, False, self.conn.apl.store)
 
         return retval 
 
