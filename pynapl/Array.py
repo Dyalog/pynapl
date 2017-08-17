@@ -364,9 +364,9 @@ class ArrayEncoder(json.JSONEncoder):
             return {"r": obj.rho, "d": obj.data, "t":obj.genTypeHint()}
         elif isinstance(obj, APLNamespace):
             return {"ns": obj.dct}
-        #elif isinstance(obj, ObjectWrapper):
-        #    cls, va, fn = obj.items()
-        #    return {"id": obj.ref(), "cls": cls, "va": va, "fn": fn}
+        elif isinstance(obj, ObjectWrapper):
+            cls, va, fn = obj.items()
+            return {"id": obj.ref(), "cls": cls, "va": va, "fn": fn}
         elif isinstance(obj, complex):
             return {"real": obj.real, "imag": obj.imag}
         else:

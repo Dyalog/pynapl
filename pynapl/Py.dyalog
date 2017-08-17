@@ -512,7 +512,7 @@
             ⍝ add in functions for all the functions
             :For fn :In ns.fn
                 :If '.'∊fn ⋄ :Continue ⋄ :EndIf
-                
+
                 clstxt,←⊂ '∇{z}←{kwargs} ',fn,' args'
                 clstxt,←⊂ '  :Access Public'
                 clstxt,←⊂ '  :If 0=⎕NC''kwargs'' ⋄ kwargs←⍬ ⋄ :EndIf'
@@ -1014,6 +1014,13 @@
             :Access Public
             Exec'import ',module
             obj←Eval module
+        ∇
+        
+        ⍝ Import from
+        ∇ {obj}←ImportFrom (module child)
+            :Access Public
+            Exec'from ',module,' import ',child
+            obj←Eval child
         ∇
 
         ⍝ expose a Python function as a monadic APL "function" (using a namespace)

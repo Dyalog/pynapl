@@ -78,8 +78,6 @@ class ObjectWrapper(object):
         fn=[]
 
         for attr in dir(obj):
-            # don't copy private items 
-            if attr.startswith('__'): continue
 
             item = getattr(obj, attr)
             if hasattr(item,'__call__'):
