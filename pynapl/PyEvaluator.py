@@ -116,8 +116,12 @@ class PyEvaluator(object):
         local = {'args':self.pyargs, 'retval':None, 'code':self.expr, 'APL':self.conn.apl}
         exec(self.wrapper, globals(), local)
         retval = local['retval']
+        #print("retval = %s: %s"%(repr(type(retval)), repr(retval)))
+
         if not isinstance(retval, APLArray):
             retval = APLArray.from_python(retval, True, self.conn.apl.store)
-
+            #print("Converting to APLArray")
+            #print("retval = %s: %s"%(repr(type(retval)), repr(retval)))
+              
         return retval 
 

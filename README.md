@@ -170,7 +170,62 @@ showPage←(py.PyFn 'webbrowser.open').Call
 showPage 'http://www.dyalog.com'
 ```
 
-#### Making Python objects available to APL
+#### Making Python modules and objects available to APL
+
+By default, Python objects that have APL equivalents are automatically 
+converted. E.g., a Python list becomes an APL vector. (See the
+"Data Conversion" section.) 
+
+Python objects that do not have such equivalents are sent as references
+instead, which can be used on the APL side to access their attributes.
+On the APL side, a stub class will be instantiated which will have
+attributes corresponding to the Python ones.
+
+```apl
+      py.Exec'import sys'
+      sys←py.Eval'sys'
+      sys.version_info
+2 7 13  final  0
+
+      5↑sys.⎕NL¯2
+ __doc__  __name__  __package__  __stderr__  __stdin__ 
+```
+
+Fields are exposed on the APL side by means of properties, which can be
+used to set and retrieve the values, and methods are exposed as functions
+which can be called:
+
+```apl
+      os←py.Import'os' ⍝ convenience functions
+      +os.getpid ⍬
+17906
+```
+
+Such functions return a shy result, and take a right argument consisting
+of a vector of positional arguments, and an optional left argument representing 
+the keyword arguments. This left argument may either be a namespace or a
+list of key-value pairs.
+
+```apl
+      json←py.Import'json'
+      +(⊂'separators' '--')json.dumps ⊂1 2 3 4
+[1-2-3-4]
+```
+
+It is also possible to send these references back to Python and interact
+with them there:
+
+```apl
+      '⎕.getpid()' py.Eval os
+17906
+```
+
+The resulting classes cannot be instantiated from APL using `⎕NEW`, they
+can only be instantiated by calling the Python constructors. The objects
+keep a reference to the `Py` instance that created them, which means
+the Python interpreter will stay alive as long as any of its objects
+are still around. On the Python side, the objects are stored by the
+interface, and released when all APL references to them have been removed.
 
 
 
@@ -358,7 +413,17 @@ If the numpy library is available, numpy matrices will be automatically
 converted to APL matrices. 
 
 If the object is none of these, an object reference will be sent to APL,
-where it can be used to access its attributes. 
+where it can be used to access its attributes. Python code can also send an
+object reference explicitly by using the `apl.obj` function.
+
+```apl
+     py.Eval 'sys' ⍝ ask for module object
+#.Py.⍙PythonObject.[module]
+     py.Eval '[1,2,3,4]' ⍝ send a list
+1 2 3 4
+     py.Eval 'apl.obj([1,2,3,4])' ⍝ send a list as an object
+#.Py.⍙PythonObject.[list]
+```
 
 
 #### From APL to Python

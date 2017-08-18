@@ -382,8 +382,10 @@ class Connection(object):
                Input may be a string or a list."""
 
             # implemented using eval 
+            if not type(code) is str: 
+                code = str(code, 'utf-8')
 
-            if type(code) in (str,bytes):
+            if not type(code) is list:
                 code = code.split("\n") # luckily APL has no multiline strings
             
             return self.eval("2⎕FIX ∆", *code)
