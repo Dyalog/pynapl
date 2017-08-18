@@ -85,8 +85,7 @@ py.Exec #.Py.ScriptFollows
 ```
 
 An `APL` object will be available to the Python code, in order
-for it to call back into the APL code. (See the "Accessing APL code
-from Python" section for more information.)
+for it to call back into the APL code. (See [Accessing APL from Python](#accessing-apl-from-python) for more information.)
 
 #### Evaluating Python expressions
 
@@ -97,8 +96,8 @@ into it. Inside the Python expression, the quad (`⎕`) or the quote-quad
 (`⍞`) can be used to refer to these arguments. If the quad is used,
 the argument will be converted to a (hopefully) suitable Python
 representation first; if the quote-quad is used, the argument will be
-exposed on the Python side as an `APLArray` object. (See the "Data
-conversion" section for more information.)
+exposed on the Python side as an `APLArray` object. (See [Data
+conversion](#data-conversion) for more information.)
 
 If the Python expression returns something other than an `APLArray`,
 it will be converted back into a suitable APL form before being sent back
@@ -225,8 +224,8 @@ The `eval` function takes a string, which will be evaluated
 using `⍎` on the APL side. Any extra arguments passed into
 `eval` will be put into a vector and exposed as `∆` on the
 APL side, and a `py` object will be available for the APL code
-to communicate back to the Python interpreter. (See "Accessing
-Python from APL".)
+to communicate back to the Python interpreter. (See [Accessing
+Python from APL](#accessing-python-from-apl).)
 
 This is a relatively low-level function, and it is probably better
 to use `fn` and `op`. 
