@@ -106,8 +106,8 @@ to APL.
 
 ```apl
      ⍝ access a variable
-     '___name___' py.Eval ⍬
-APLPyConnect
+     py.Eval '__name__'
+pynapl.PyEvaluator
 
      ⍝ add two numbers
      '⎕+⎕' py.Eval 2 2
@@ -170,6 +170,11 @@ showPage←(py.PyFn 'webbrowser.open').Call
 ⍝ this will now show a web page
 showPage 'http://www.dyalog.com'
 ```
+
+#### Making Python objects available to APL
+
+
+
 
 #### Error handling
 
@@ -352,6 +357,9 @@ _NOTE_: if the object is an infinite generator, it will cause a hang.
 
 If the numpy library is available, numpy matrices will be automatically
 converted to APL matrices. 
+
+If the object is none of these, an object reference will be sent to APL,
+where it can be used to access its attributes. 
 
 
 #### From APL to Python
