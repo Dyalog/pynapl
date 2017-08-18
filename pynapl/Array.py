@@ -219,7 +219,7 @@ class APLArray(object):
 
         elif type(obj) is bytes:
             # a non-unicode string will be encoded as UTF-8
-            return APLArray.from_python(str(obj, "utf8"),False,objectstore)
+            return APLArray.from_python(str(obj, "utf8"),enclose,objectstore)
 
         # if the object is iterable, but not one of the above, try making a list out of it
         if isinstance(obj, collections.Iterable) \
