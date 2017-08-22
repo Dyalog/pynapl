@@ -44,7 +44,9 @@ def runSlave(inp,outp):
         outp.openWrite()
 
         conn = C.Connection(inp,outp)
-    
+   
+    print("Connected.")
+
     conn.runUntilStop()
     sys.exit(0)
 
@@ -61,6 +63,7 @@ if __name__=="__main__":
     signal.signal(signal.SIGINT, signal.default_int_handler)
 
     if 'thread' in sys.argv:
+        print("Starting thread")
         # run in a thread
         threading.Thread(target=lambda:runSlave(infile,outfile)).start()
     else:

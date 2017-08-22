@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
         name="Py'n'APL",
-        version='0.0.4.dev1',
+        version='0.0.5.dev1',
         
         description='Python - Dyalog APL interface',
         long_description="""

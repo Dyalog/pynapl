@@ -36,7 +36,7 @@ def maybe_ord(item):
         return ord(item)
 
 # these fail when threaded, but that's OK
-def ignoreInterrupts(): 
+def ignoreInterrupts():
     try: return signal.signal(signal.SIGINT, signal.SIG_IGN)
     except ValueError: return None # (not on main thread)
 
@@ -232,7 +232,7 @@ class Connection(object):
                 if not self.pid:
                     return
                 try: Message(Message.STOP, "STOP").send(self.conn.outfile)
-                except ValueError: pass # if already closed, don't care
+                except (ValueError, AttributeError): pass # if already closed, don't care
                 
                 # close the pipes
                 try:
@@ -528,18 +528,19 @@ class Connection(object):
         while True: 
             s = None
             try:
-                s = ignoreInterrupts()
+                # only turn off interrupts if the APL side is in control
+                if self.isSlave: s = ignoreInterrupts()
                 msg = Message.recv(self.infile)
 
                 if msg.type in (msgtype, Message.ERR):
                     return msg
                 else:
-                    allowInterrupts()
+                    if self.isSlave: allowInterrupts()
                     self.respond(msg)
             except KeyboardInterrupt:
                 self.apl.interrupt()
             finally:
-                setInterrupts(s)
+                if self.isSlave: setInterrupts(s)
                 pass
 
     def respond(self, message):
