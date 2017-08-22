@@ -32,44 +32,97 @@ if sys.version_info.major == 2:
 
 # assuming ⎕IO=0 for now
 class APLNamespace(object):
-    def __init__(self, dct=None):
+    def __init__(self, dct=None, apl=None):
         if dct is None: self.dct={}
         else: self.dct=dct
+
+        self.apl = apl
 
     def __getitem__(self, x):
         return self.dct[x]
 
     def __setitem__(self, x, val):
-        self.dct[x] = APLArray.from_python(val, enclose=False)
+        self.dct[x] = APLArray.from_python(val, enclose=False, apl=self.apl)
 
     def toJSONString(self):
         return json.dumps(self, cls=ArrayEncoder, ensure_ascii=False)
 
     # convert an APL namespace to a Python dictionary
-    def to_python(self,objstore=None):
+    def to_python(self,apl=None):
         newdct = {}
         for x in self.dct:
             obj = self.dct[x]
             if isinstance(obj, APLArray) \
             or isinstance(obj, APLNamespace) \
+            or isinstance(obj, APLObjectFactory) \
             or isinstance(obj, ObjectRef):
-                newdct[x] = obj.to_python(objstore)
+                newdct[x] = obj.to_python(apl)
             else:
                 newdct[x] = obj
         return newdct
 
     @staticmethod
     # convert a Python dictionary to an APL namespace
-    def from_python(dct):
+    def from_python(dct, apl=None):
         newdct = {}
         for x in dct: 
-            newdct[x] = APLArray.from_python(dct[x])
-        return APLNamespace(newdct)
+            newdct[x] = APLArray.from_python(dct[x], apl=apl)
+        return APLNamespace(newdct, apl=apl)
 
 
     @staticmethod 
     def fromJSONString(string):
         return APLArray._json_decoder.decode(string)
+
+class APLObjectFactory(object):
+    """Makes an APL object."""
+
+    def __init__(self, dct):
+        self.__id = dct['id']
+        self.__va = dct['va']
+        self.__fn = dct['fn']
+
+    
+    def to_python(self, apl):
+        return APLObject(apl, self.__id, self.__va, self.__fn)
+        
+class APLObject(object):
+    """Can be used to interact with an APL object."""
+    
+    def __init__(self, apl, id, va, fn):
+        self.__s={'apl':apl, 'id':id, 'va':va, 'fn':fn}
+
+        # create function stubs
+        for f in fn:
+            fname=f
+            # In Python 2, f must be encoded - this is lossy, so APL class members that
+            # have non-ASCII names get their names mangled
+            if sys.version_info.major == 2:
+                fname=f.encode('ascii','replace')
+            
+            object.__setattr__(self, fname, apl.fn("(py.⍙Access'%s').%s" % (id, f)))
+
+    def __getattr__(self, name):
+        if name=='_APLObject__s':
+            return object.__getattribute__(self, name)
+
+        elif name in self.__s['va']:
+            # retrieve the value from APL instead
+            return self.__s['apl'].eval("(py.⍙Access'%s').%s" % (self.__s['id'], name))
+        elif name in self.__s['fn'] or name.startswith('_'): 
+            return object.__getattribute__(self, name)
+        else:
+            raise AttributeError('No such field: %s' % name)
+
+    def __setattr__(self, name, value):
+        if name=='_APLObject__s':
+            object.__setattr__(self,name,value)
+        elif name in self.__s['va']:
+            # set the value on the APL side
+            self.__s['apl'].fn("{(py.⍙Access'%s').%s ← ⍵}" % (self.__s['id'], name))(value)
+        else:
+            raise AttributeError('No such field: %s' % name)
+            
 
 
 
@@ -99,6 +152,9 @@ class APLArray(object):
             elif 'ns' in jsobj:
                 # this is an APL namespace, which can be represented as a dict in Python
                 return APLNamespace(jsobj['ns'])
+            elif 'id' in jsobj:
+                # this is a reference to an APL object
+                return APLObjectFactory(jsobj)
             elif 'rid' in jsobj:
                 # this is a reference to a Python object sent over APL
                 return ObjectRef(jsobj['rid'])
@@ -115,7 +171,7 @@ class APLArray(object):
 
 
     # convert array to suitable-ish python representation
-    def to_python(self, store=None):
+    def to_python(self, apl=None):
         """Convert an APLArray to a Python object.
 
         Multidimensional arrays will be split up row-by-row and returned as a nested list, 
@@ -123,9 +179,10 @@ class APLArray(object):
 
         if len(self.rho)==0: # scalar
             scalar = self.data[0]
-            if isinstance(scalar, APLArray): return scalar.to_python(store)
-            elif isinstance(scalar, APLNamespace): return scalar.to_python(store)
-            elif isinstance(scalar, ObjectRef): return scalar.to_python(store)
+            if isinstance(scalar, APLArray): return scalar.to_python(apl)
+            elif isinstance(scalar, APLNamespace): return scalar.to_python(apl)
+            elif isinstance(scalar, ObjectRef): return scalar.to_python(apl)
+            elif isinstance(scalar, APLObjectFactory): return scalar.to_python(apl)
             else: return scalar
 
         elif len(self.rho)==1: # array
@@ -142,8 +199,9 @@ class APLArray(object):
                 for item in self.data:
                     if isinstance(item,APLArray) \
                     or isinstance(item,APLNamespace) \
+                    or isinstance(item,APLObjectFactory) \
                     or isinstance(item,ObjectRef):
-                        item=item.to_python(store)
+                        item=item.to_python(apl)
                     
                     pylist.append(item)
                 return pylist
@@ -154,13 +212,13 @@ class APLArray(object):
             # nocopy is safe here because arr is never modified
             while len(arr.rho)>0: arr=arr.split(nocopy=True)
             # convert the flattened array to a python representation
-            return arr.to_python(store)
+            return arr.to_python(apl)
 
         raise RuntimeError("rho < 0; rho=%d!" % self.rho)
 
 
     @staticmethod
-    def from_python(obj, enclose=True, objectstore=None):
+    def from_python(obj, enclose=True, apl=None):
         """Create an APLArray from a Python object.
         
         Objects may be numbers, strings, or lists.
@@ -169,7 +227,7 @@ class APLArray(object):
         """
     
         if obj is None:
-            return APLArray.from_python([]) #Return the empty list for "None"
+            return APLArray.from_python([], apl=apl) #Return the empty list for "None"
 
         if NUMPY_SUPPORT:
             # special case this
@@ -181,50 +239,52 @@ class APLArray(object):
                 for i in range(rank-1):
                     l = sum(l, [])
                 
-                l = [APLArray.from_python(x,False,objectstore) for x in l]
-                return APLArray(rho=shape, data=l)
+                l = [APLArray.from_python(x,False,apl) for x in l]
+                return APLArray(rho=shape, data=l, apl=apl)
 
         if isinstance(obj, APLArray) \
         or isinstance(obj, APLNamespace) \
+        or isinstance(obj, APLObject) \
         or isinstance(obj, ObjectWrapper):
             return obj # it already is of the right type
 
         if type(obj) is dict:
             # convert all items in the dictionary to APL representation
-            return APLNamespace.from_python(obj)
+            return APLNamespace.from_python(obj, apl=apl)
 
         # lists, tuples and strings can be represented as vectors
         if type(obj) in (list,tuple):
             return APLArray(rho=[len(obj)], 
-                            data=[APLArray.from_python(x,False,objectstore) for x in obj])
+                            data=[APLArray.from_python(x,False,apl) for x in obj],
+                            apl=apl)
         
         # numbers can be represented as numbers, enclosed if at the upper level so we always send an 'array'
         elif type(obj) in (int,long,float,complex): 
-            if enclose: return APLArray(rho=[], data=[obj], type_hint=APLArray.TYPE_HINT_NUM)
+            if enclose: return APLArray(rho=[], data=[obj], type_hint=APLArray.TYPE_HINT_NUM, apl=apl)
             else: return obj
 
         # boolean scalars should convert to ints for APL's sake
         elif type(obj) is bool:
-            return APLArray.from_python(int(obj))
+            return APLArray.from_python(int(obj),enclose,apl)
 
         # a one-element string is a character, a multi-element string is a vector
         elif type(obj) is str:
             if len(obj) == 1:
-                if enclose: return APLArray(rho=[], data=[obj], type_hint=APLArray.TYPE_HINT_CHAR)
+                if enclose: return APLArray(rho=[], data=[obj], type_hint=APLArray.TYPE_HINT_CHAR, apl=apl)
                 else: return obj
             else:
-                aplstr = APLArray.from_python(list(obj),False,objectstore)
+                aplstr = APLArray.from_python(list(obj),False,apl)
                 aplstr.type_hint = APLArray.TYPE_HINT_CHAR
                 return aplstr
 
         elif type(obj) is bytes:
             # a non-unicode string will be encoded as UTF-8
-            return APLArray.from_python(str(obj, "utf8"),enclose,objectstore)
+            return APLArray.from_python(str(obj, "utf8"),enclose,apl)
 
         # if the object is iterable, but not one of the above, try making a list out of it
         if isinstance(obj, collections.Iterable) \
         or hasattr(obj, '__iter__'):
-            return APLArray.from_python(list(obj),False,objectstore)
+            return APLArray.from_python(list(obj),False,apl)
 
         # last ditch resort: if the object implements __len__ and __getitem__,
         # we can iterate over it and get the objects that way
@@ -232,16 +292,16 @@ class APLArray(object):
             try:
                 ls = []
                 for idx in range(len(obj)): ls.append(obj[idx])
-                return APLArray.from_python(ls,False,objectstore)
+                return APLArray.from_python(ls,False,apl)
             except:
                 # if an exception occurs while trying this, let's just report that
                 # we don't support it.
                 raise TypeError("type not supported: " + repr(type(obj)))
 
 
-        if not objectstore is None:
+        if not apl is None:
             # Wrap the object, store it, send a reference
-            return ObjectWrapper(objectstore, obj)
+            return ObjectWrapper(apl.store, obj)
         else:
             # Nope
             raise TypeError("type not supported: " + repr(type(obj)))
@@ -254,7 +314,7 @@ class APLArray(object):
             if isinstance(item, APLArray): data.append(item.copy())
             else: data.append(item)
 
-        return APLArray(rho, data, self.genTypeHint())
+        return APLArray(rho, data, self.genTypeHint(), apl=self.apl)
 
     def __eq__(self, other):
         if self.rho != self.rho: return False
@@ -279,7 +339,7 @@ class APLArray(object):
         elif len(self.rho)==1: 
             # equivalent to enclose
             arr=self if nocopy else self.copy()
-            return APLArray(rho=[], data=[self], type_hint=self.genTypeHint())
+            return APLArray(apl=self.apl, rho=[], data=[self], type_hint=self.genTypeHint())
         else:
             newrho = self.rho[:-1]
             blocksz = self.rho[-1]
@@ -294,9 +354,10 @@ class APLArray(object):
                     if isinstance(item, APLArray) and not nocopy: item=item.copy()
                     blockdata.append(item)
 
-                newdata.append(APLArray(rho=[blocksz], data=blockdata, type_hint=self.genTypeHint()))
+                newdata.append(APLArray(apl=self.apl, rho=[blocksz], 
+                                          data=blockdata, type_hint=self.genTypeHint()))
 
-            return APLArray(rho=newrho, data=newdata, type_hint=self.genTypeHint())
+            return APLArray(apl=self.apl, rho=newrho, data=newdata, type_hint=self.genTypeHint())
         
     def genTypeHint(self):
         if not self.type_hint is None:
@@ -315,8 +376,9 @@ class APLArray(object):
             self.type_hint = APLArray.TYPE_HINT_NUM
         return self.type_hint
 
-    def __init__(self, rho, data, type_hint=None):
+    def __init__(self, rho, data, type_hint=None, apl=None):
         self.rho=rho
+        self.apl=apl
         self.data=extend(list(data), product(rho))
         # deduce type from data
         if not type_hint is None:
@@ -347,7 +409,7 @@ class APLArray(object):
     def __setitem__(self,idx,val):
         idx = self.check_valid_idx(idx)
         # make sure that if arrays are added, they are converted transparently
-        self.data[self.flatten_idx(idx)]=APLArray.from_python(val,enclose=False)
+        self.data[self.flatten_idx(idx)]=APLArray.from_python(val,enclose=False,apl=self.apl)
 
     def toJSONString(self):
         return json.dumps(self, cls=ArrayEncoder, ensure_ascii=False)
@@ -364,6 +426,8 @@ class ArrayEncoder(json.JSONEncoder):
             return {"r": obj.rho, "d": obj.data, "t":obj.genTypeHint()}
         elif isinstance(obj, APLNamespace):
             return {"ns": obj.dct}
+        elif isinstance(obj, APLObject):
+            return {"rid": obj._APLObject__s['id']} 
         elif isinstance(obj, ObjectWrapper):
             cls, va, fn = obj.items()
             return {"id": obj.ref(), "cls": cls, "va": va, "fn": fn}

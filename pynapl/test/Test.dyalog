@@ -2,13 +2,15 @@
 
     :Section Startup / shutdown
         py ← ⍬
-        ∇StartUp
+        ∇StartUp v
             ⍝ Initialize a Python
-            py ← ⎕NEW #.Py.Py
+            ⎕EX'py'
+            py ← ⎕NEW #.Py.Py ('Version' v)
         ∇
 
         ∇ShutDown
             py.Stop
+            ⎕EX'py'
         ∇
     :EndSection
 
@@ -91,56 +93,53 @@
         ∇
 
         ⍝ test importing module
-        ∇ r←TEST_08⍙modules;hashlib;m
-            ⍙EV←'ce114e4501d2f4e2dcea3e17b546f339'
-            
+        ∇ r←TEST_08⍙modules;json
+            ⍙EV←1 2 3 4 5
+
             ⍝ import a module
-            hashlib←py.Import'hashlib'
-            ⍝ instantiate an object
-            m←hashlib.md5 ⍬
-            ⍝ call a method
-            m.update ⊂'This is a test'
-            ⍝ get the value back
-            r←m.hexdigest ⍬
+            json←py.Import'json'
+            ⍝ call methods from it
+            str←json.dumps ⊂⍙EV
+            r←json.loads ⊂str 
         ∇
-        
+
         ⍝ test that we can pass an object back and forth
         ∇ r←TEST_09⍙objects;x
             ⍙EV←⍬
             r←⍬
-            
+
             ⍝ define an object
             py.Exec #.Py.ScriptFollows
             ⍝ class X(object):
             ⍝   def __init__(self, n):
             ⍝      self.n = n
-            
-            
+
+
             ⍝ instantiate it and bring it into APL
             x←py.Eval'X(42)'
-            
+
             ⍝ try to access it from APL (should give 42)
             ⍙EV,←42 ⋄ r,←x.n
-            
+
             ⍝ try to access it from Python (should also give 42)
             ⍙EV,←42 ⋄ r,←'⎕.n' py.Eval ⊂x
-            
+
             ⍝ try to set it from APL
             x.n←88
-            
+
             ⍝ try to access it from APL (should now give 88)
             ⍙EV,←88 ⋄ r,←x.n
-            
+
             ⍝ try to access it from Python (should now also give 88)
             ⍙EV,←88 ⋄ r,←'⎕.n' py.Eval ⊂x
-            
+
             ⍝ store a reference on the Python side and change that
             'x' py.Set x
             py.Exec 'x.n=99'
-            
+
             ⍝ this change should be reflected in APL
             ⍙EV,←99 ⋄ r,←x.n
-            
+
         ∇
 
     :EndSection
@@ -162,8 +161,8 @@
         ⍝ A test must set ⍙EV to the expected value.
         ⍝ ¯1 = unexpected crash, 0 = fail, 1 = ok
         RunTest←{
-            0::¯1
-            ⍙EV≡⍎⍵
+            0::¯1⊣msg∘←⍕⎕DMX.(EN EM Message)
+            ⍙EV≡⍎⍵⊣msg∘←''
         }
 
         ⍝ Run one test
@@ -174,13 +173,14 @@
         ∇
 
         ⍝ Run all tests
-        ∇summary←RunTests;tests;rslts
-            StartUp
+        ∇summary←RunTests v;tests;rslts
+            StartUp v
             rslts←{
                 (⍳⍴⍵)(⍵{
                     ⍞←'Running ',(¯3↑⍕⍺),'/',(¯3↑⍕⍴⍺⍺),': ',30↑'⍙'StripFrom⍵
                     rs←RunTest ⍵
                     ⍞←' ',⊃'CRASH' 'FAIL' 'OK'[2+rs]
+                    ⍞←' ',msg
                     ⍞←⎕TC[2]
                     rs
                 })¨⍵

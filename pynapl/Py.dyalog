@@ -60,7 +60,8 @@
     ∇
 
     :Class JSONSerializer
-
+        :Field Public Instance pyclass
+        
         ⍝ deserialize
         ∇ r←pyclass deserialize json
             :Access Public Shared
@@ -85,6 +86,12 @@
             :If 0≠⎕NC'obj.id'
                 ⍝ a Python object wrapper
                 r←pyclass decodeOW obj
+                :Return
+            :EndIf
+
+            :If 0≠⎕NC'obj.rid'
+                ⍝ a reference to one of our own objects
+                r←pyclass.⍙Access obj.rid
                 :Return
             :EndIf
 
@@ -127,10 +134,17 @@
             :EndFor
         ∇
 
+        ∇init pyc
+            :Access Public
+            :Implements Constructor
+            pyclass←pyc
+        ∇
+        
         ⍝ serialize
-        ∇ r←serialize obj;enc;ns
+        ∇ r←pyclass serialize obj;enc;ns;encr
             :Access Public Shared
-            enc←encode obj
+            encr←⎕NEW #.Py.JSONSerializer pyclass
+            enc←encr.encode obj
             :If 0=⎕NC'enc.r'
                 ns←⎕NS''
                 ns.r←⍬
@@ -156,7 +170,7 @@
 
         ⍝ create something JSONizable from an APL object
         ∇ r←{taboo}encode obj;arrns
-            :Access Public Shared
+            :Access Public 
 
             :If 0=⎕NC'taboo' ⋄ taboo←⍬ ⋄ :EndIf
 
@@ -167,7 +181,10 @@
             :EndIf
 
             :If ~(⎕NC⊂'obj')∊2.1 2.2 9.1
-                ⎕SIGNAL⊂('EN' 6)('Message' 'Only values and namespaces containing values can be serialized.')
+                ⍝ try to encode it using the pyclass
+                r←taboo encode (pyclass.Obj obj)
+                :Return
+                ⍝⎕SIGNAL⊂('EN' 6)('Message' 'Only values and namespaces containing values can be serialized.')
             :EndIf
 
             :If 0=≡obj
@@ -200,7 +217,7 @@
 
         ⍝ encapsulate namespace
         ∇ r←{taboo}encapsulate obj;ns;children;child;enc
-            :Access Public Shared
+            :Access Public
 
             :If 0=⎕NC'taboo' ⋄ taboo←⍬ ⋄ :EndIf
 
@@ -534,6 +551,7 @@
             ⍝ fix the class
             cls←clns.⎕FIX clstxt
 
+
             ⍝ instantiate it
             z←⎕NEW cls (pyclass ns)
         ∇
@@ -595,6 +613,91 @@
 
     :EndClass
 
+    ⍝ This class stores references to instances of other objects, to keep track of them
+    ⍝ so the Python side can use references to them. 
+    :Class ObjectStore
+        :Field Private objects
+
+        ⍝ columns
+        :Field Private REF←1
+        :Field Private OBJ←2
+        :Field Private CNT←3
+
+        :Field Private refno←0
+
+        ∇init
+            :Access Public
+            :Implements Constructor
+            objects←0 3⍴⍬ ⍝ matrix: 
+        ∇
+
+        ⍝ get next reference number
+        ∇ref←NextRef
+            refno+←1
+            ref←(' '≠ref)/ref←40 0⍕refno
+        ∇
+
+        ⍝ Retrieve object reference
+        ∇obj←Retrieve ref;loc
+            :Access Public
+            loc←objects[;REF]⍳⊂ref
+            ⎕SIGNAL(loc>≢objects)/⊂('EN'6)('Message' 'Invalid object reference')
+            obj←⊃objects[loc;OBJ]
+        ∇ 
+
+        ⍝ Store an object (called from the Python side)
+        ∇ref←Store obj;loc
+            :Access Public
+            ⍝ do we already have it?
+            :If (loc←objects[;OBJ]⍳obj)≤≢objects
+                ⍝ yes, increase the refcount and return the reference we already had
+                objects[loc;CNT]+←1
+                ref←⊃objects[loc;REF]
+            :Else
+                ⍝ we don't, add it with refcount 1
+                ref←NextRef
+                objects⍪←⍉⍪ref obj 1
+            :EndIf
+        ∇
+
+        ⍝ Release an object (called from the Python side)
+        ∇Release ref;loc
+            :Access Public
+            loc←objects[;REF]⍳⊂ref
+            ⎕SIGNAL(loc>≢objects)/⊂('EN'6)('Message' 'Invalid object reference')
+            objects[loc;CNT]-←1
+            objects⌿⍨←objects[;CNT]>0
+        ∇        
+    :EndClass
+
+    ⍝ This can wrap an APL object and then be sent to Python
+    :Class ObjectWrapper
+        :Field Private store
+        :Field Private ref
+
+        ∇init (store_ obj)
+            :Access Public
+            :Implements Constructor
+
+            store←store_
+            ref←store.Store obj
+        ∇
+
+        ∇enc←⍙encode;obj
+            :Access Public
+            obj←store.Retrieve ref
+            enc←⎕NS''
+
+            enc.id←ref
+            enc.va←obj.⎕NL-2 9
+            enc.fn←obj.⎕NL-3
+            ⍝ operators aren't necessary because classes can't have public operators anyway
+        ∇
+    :EndClass
+
+
+
+
     ⍝ Connect to 
     :Class Py
 
@@ -655,6 +758,30 @@
         ⍝ This field can be set to 0 to disallow interrupts completely
         :Field Private noInterrupts←0
 
+        ⍝ Holds references to object instances sent to Python, so they can be accessed
+        ⍝ and aren't garbage-collected.
+        :Field Private objectStore←⍬
+
+        :Section Python object references
+            ⍝ Wrap an object so that a reference to it can be sent to Python
+            ∇ r←Obj obj
+                :Access Public
+                r←⎕NEW ObjectWrapper (objectStore obj)
+            ∇
+
+            ⍝ Called by the Python side to access an APL object
+            ∇ r←⍙Access ref
+                :Access Public
+                r←objectStore.Retrieve ,ref
+            ∇
+
+            ⍝ Called by the Python side to release an APL object
+            ∇ ⍙Release ref
+                :Access Public
+                objectStore.Release ,ref
+            ∇
+        :EndSection
+
         ⍝ JSON serialization/deserialization
         :Section JSON serialization/deserialization
             ⍝ Check whether an array is serializable
@@ -665,7 +792,7 @@
             }
 
             ⍝ Serialize a (possibly nested) array
-            serialize←{#.Py.JSONSerializer.serialize ⍵}
+            serialize←{⎕THIS #.Py.JSONSerializer.serialize ⍵}
 
             ⍝ Deserialize a (possibly nested) array
             ⍝ Pass along an instance of the class so we can pass _that_ along to Python object wrappers
@@ -1015,7 +1142,7 @@
             Exec'import ',module
             obj←Eval module
         ∇
-        
+
         ⍝ Import from
         ∇ {obj}←ImportFrom (module child)
             :Access Public
@@ -1155,6 +1282,7 @@
         ⍝ Initialization common to the server and the client
         ∇ InitCommon
             pyaplns←⎕NS''
+            objectStore←⎕NEW #.Py.ObjectStore
 
             ⍝ check OS
             :If ∨/'Windows'⍷⊃#.⎕WG'APLVersion'

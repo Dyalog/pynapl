@@ -96,8 +96,8 @@ class ObjectRef(object):
         self.ref = ref
 
     # to match the Array function.
-    def to_python(self, store):
-        return store.retrieve(self.ref)
+    def to_python(self, apl):
+        return apl.store.retrieve(self.ref)
 
 class WrappedObjectEncoder(json.JSONEncoder):
     def default(self, obj):

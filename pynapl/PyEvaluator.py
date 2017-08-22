@@ -92,9 +92,10 @@ class PyEvaluator(object):
                 curarg = self.args[[narg]]
                 if ch==u'⎕' and (isinstance(curarg,APLArray) 
                               or isinstance(curarg,APLNamespace)
+                              or isinstance(curarg,APLObjectFactory)
                               or isinstance(curarg,ObjectRef)):
                     # this argument should be converted to a suitable Python representation
-                    self.pyargs.append(curarg.to_python(self.conn.apl.store))
+                    self.pyargs.append(curarg.to_python(self.conn.apl))
                 else:
                     self.pyargs.append(curarg)
                     
@@ -119,7 +120,7 @@ class PyEvaluator(object):
         #print("retval = %s: %s"%(repr(type(retval)), repr(retval)))
 
         if not isinstance(retval, APLArray):
-            retval = APLArray.from_python(retval, True, self.conn.apl.store)
+            retval = APLArray.from_python(retval, True, self.conn.apl)
             #print("Converting to APLArray")
             #print("retval = %s: %s"%(repr(type(retval)), repr(retval)))
               
