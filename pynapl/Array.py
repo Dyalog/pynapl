@@ -81,11 +81,16 @@ class APLObjectFactory(object):
         self.__id = dct['id']
         self.__va = dct['va']
         self.__fn = dct['fn']
+        self.__invalid = False
 
     
     def to_python(self, apl):
-        return APLObject(apl, self.__id, self.__va, self.__fn)
-        
+        if not self.__invalid:
+            self.__invalid = True # only use once
+            return APLObject(apl, self.__id, self.__va, self.__fn)
+        else:
+            raise RuntimeError("Tried to use the same reference more than once.")
+            
 class APLObject(object):
     """Can be used to interact with an APL object."""
     
@@ -122,6 +127,16 @@ class APLObject(object):
             self.__s['apl'].fn("{(py.⍙Access'%s').%s ← ⍵}" % (self.__s['id'], name))(value)
         else:
             raise AttributeError('No such field: %s' % name)
+
+    def __del__(self):
+        # try to tell the APL instance to free this object, if it still exists
+        # it may already be shut down, so don't throw any errors
+        try:
+            self.__s['apl'].fn('py.⍙Release')(self.__s['id'])
+        except:
+            pass
+
+
             
 
 
