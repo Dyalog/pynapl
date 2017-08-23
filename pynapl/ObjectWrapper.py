@@ -82,10 +82,19 @@ class ObjectWrapper(Sendable):
         for attr in dir(obj):
 
             item = getattr(obj, attr)
-            if hasattr(item,'__call__'):
-                fn.append(attr)
-            else:
-                va.append(attr)
+            try:
+                if hasattr(item,'__call__'):
+                    fn.append(attr)
+                else:
+                    va.append(attr)
+            except ImportError:
+                # There are modules which import other modules conditionally,
+                # which aren't necessarily available, but which would only give
+                # an error if you actually tried to use it. Since this wrapper
+                # pokes everything, it would trap all of that, so we catch
+                # ImportError and ignore it. If something could not be imported,
+                # it is simply not included in the list of attributes. 
+                pass
 
         return classname, va, fn
 
