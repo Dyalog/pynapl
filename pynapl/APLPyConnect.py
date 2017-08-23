@@ -394,7 +394,7 @@ class Connection(object):
                          .replace('{⋄','{').replace('⋄}','}') \
                          .replace('(⋄','(').replace('⋄)',')')
 
-            payload = APLArray.from_python([aplexpr, args], self).toJSONString()
+            payload = APLArray.from_python([aplexpr, args], apl=self).toJSONString()
             Message(Message.EVAL, payload).send(self.conn.outfile)
 
             reply = self.conn.expect(Message.EVALRET)

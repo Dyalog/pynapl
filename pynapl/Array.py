@@ -236,7 +236,7 @@ class APLArray(Sendable, Receivable):
 
         If the object is already an APLArray, it will be returned unchanged.
         """
-    
+   
         if obj is None:
             return APLArray.from_python([], apl=apl) #Return the empty list for "None"
 
