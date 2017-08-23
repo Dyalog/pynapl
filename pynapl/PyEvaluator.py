@@ -108,7 +108,6 @@ class PyEvaluator(object):
 
     def __check_arg_lens_match(self):
         if self.args.rho[0] != len(self.pyargs):
-        #if self.args.rho[0] != sum(ch in u"⎕⍞" for ch in self.expr):
             raise TypeError("expression argument length mismatch")
 
             
@@ -117,12 +116,9 @@ class PyEvaluator(object):
         local = {'args':self.pyargs, 'retval':None, 'code':self.expr, 'APL':self.conn.apl}
         exec(self.wrapper, globals(), local)
         retval = local['retval']
-        #print("retval = %s: %s"%(repr(type(retval)), repr(retval)))
 
         if not isinstance(retval, APLArray):
             retval = APLArray.from_python(retval, True, self.conn.apl)
-            #print("Converting to APLArray")
-            #print("retval = %s: %s"%(repr(type(retval)), repr(retval)))
               
         return retval 
 
