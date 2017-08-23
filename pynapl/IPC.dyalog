@@ -13,9 +13,9 @@
         
         ⍝ Figure out which OS we're on and select the correct IPC class
         :If isOS 'Windows'
-            ⍝ In a world without walls, who needs Windows and Gates?
-            #.IPC.Windows.Init
-            #.IPC.OS←#.IPC.Windows
+            ⍝ NOTE: named pipes on Windows didn't work well, so for now TCP is used on Windows.
+            ⍝ #.IPC.Windows.Init
+            #.IPC.OS←#.IPC.Windows ⍝ this will NONCE ERROR if the rest of the code actually triees to use it
         :ElseIf isOS 'Linux'
         :OrIf isOS 'Mac'
             ⍝ WE HAVE A GREAT OPERATING SYSTEM, FOLKS, THE BEST
@@ -194,195 +194,22 @@
     :EndNamespace
 
     :Namespace Windows   
-        :Section Assorted Windows constants
-            GENERIC_WRITE←16⊥4 0 0 0 0 0 0 0
-            GENERIC_READ ←16⊥8 0 0 0 0 0 0 0
-            CREATE_NEW   ←1
-            FILE_ATTRIBUTE_NORMAL←128  
-            PIPE_ACCESS_DUPLEX←3
-            PIPE_ACCESS_INBOUND←1
-            PIPE_ACCESS_OUTBOUND←2 
-            PIPE_TYPE_BYTE←0
-
-        :EndSection
         ∇ Init  
-            ⎕NA'P  Kernel32.dll|CreateNamedPipeW <0T[] U4 U4 U4 U4 U4 U4 P'
-            ⎕NA'P  Kernel32.dll|CreateFileW <0T[] U4 U4 P U4 U4 P'
-            ⎕NA'I  Kernel32.dll|WriteFile& P <U1[] U4 >U4'
-            ⎕NA'I  Kernel32.dll|ReadFile& P =U1[] U4 >U4'
-            ⎕NA'I  Kernel32.dll|CloseHandle P'
-            ⎕NA'U4 Kernel32.dll|GetLastError' 
-            ⎕NA'I  Kernel32.dll|PeekNamedPipe P =U1[] U4 >U4 >U4 >U4'  
-            ⎕NA'I  Kernel32.dll|ConnectNamedPipe& P P'
-            ⎕NA'   Rpcrt4.dll  |UuidCreate >U1[8]'
+           ⍝ Windows removed, wasn't working well. For now, a TCP connection is used on Windows. 
         ∇
 
         :Class FIFO
-            :Field Private name
-            :Field Private handle
-            :Field Private open←0 
-            :Field Private mkNew←0
-
-            :Field Private pipeReadWaiting←0
-            :Field Private NAME_PFX←'\\.\pipe\APLPY-'
-
-            ⍝ See what the invalid handle is   
-            ∇i←invalidHandle                
-                :Access Public
-
-                ⍝ This is a very hacky way to do it, but it "works". 
-                ⍝ The name is known invalid and so is the max_instances parameter (256).
-                i←#.IPC.Windows.CreateNamedPipeW ',\!INVALID!\,' 2 0 256 512 512 0 0
-            ∇                                                                       
-
             ∇initNew;r  
-
                 :Access Public
                 :Implements Constructor
-
-                mkNew←1                              
-
-                ⍝ generate a random name for our pipe
-                ⎕←'Initializing pipe ',name←NAME_PFX,1↓∊'-',¨⍕¨#.IPC.Windows.UuidCreate 0  
+                'Use TCP sockets on Windows.' ⎕SIGNAL 16
             ∇    
-
             ∇initOpen fn
                 :Access Public
                 :Implements Constructor
-
-                mkNew←0
-                name←fn
+                'Use TCP sockets on Windows.' ⎕SIGNAL 16                                        
             ∇             
-
-            ∇ destroy
-                :Implements Destructor
-                Close
-            ∇
-
-            ⍝ See how much data is available
-            ∇ (b data avl)←Peek_ n;dummy1;rd;dummy2
-                :Access Public
-                b data rd avl dummy2←#.IPC.Windows.PeekNamedPipe handle (n/0) n 0 0 0
-            ∇  
-
-            ∇ n←Name
-                :Access Public
-                n←name
-            ∇
-
-
-            readbuf←⍬
-            ∇ data←Read nbytes;b;avl;err;data 
-                :Access Public
-                ⍝ This probably isn't the best way to do APL-interruptable synchronous I/O
-
-                ⍝ Busy-wait until we have enough data available
-                :Trap 1000  
-                    retry:   →skip
-                    readbuf←⍬  
-                    :Repeat 
-                        b data avl←Peek_ nbytes
-                        pipeReadWaiting×←~b
-                    :Until (~b)∨avl≥nbytes
-
-                    ⍝ If we can't peek, then something has gone horribly wrong   
-                    :If ~b
-                        err←#.IPC.Windows.GetLastError
-                        :If err=230
-                        :AndIf pipeReadWaiting
-                            ⍝ we're just still waiting for the connection
-                            ⎕DL ÷2                                      
-                            →retry
-                        :Else
-                            ('Something has gone wrong: ',⍕err) ⎕SIGNAL 999
-                        :EndIf
-                    :EndIf                                               
-
-                    skip:
-                    ⍝ We should now have enough data available to read, so read it 
-                    pipeReadWaiting←0
-                    data←Read_ nbytes
-                :Else                      
-                    ⍝ This is to match the Unix interface, which signals EINTR
-                    ⍝ if it is interrupted. Windows doesn't quite do interrupts.
-                    'Interrupt' ⎕SIGNAL 998
-                :EndTrap
-            ∇
-
-            ⍝ Low-level read
-            ∇ data←Read_ nbytes;r;n;bytes
-                :Access Public
-                r bytes n←#.IPC.Windows.ReadFile handle (nbytes/0) nbytes 0 
-                :If r=0
-                    ('Windows error: ',⍕#.IPC.Windows.GetLastError)⎕SIGNAL 999
-                :EndIf
-                data←n↑bytes
-            ∇   
-
-            ⍝ Dunno if we need any special wrapping for this but we'll see
-            ∇ Write bytes;r 
-                :Access Public
-                {}Write_ bytes
-            ∇
-
-            ∇ n←Write_ bytes;r
-                :Access Public
-                r n←#.IPC.Windows.WriteFile handle bytes (≢bytes) 0
-                :If r=0
-                    ('Windows error: ',⍕#.IPC.Windows.GetLastError)⎕SIGNAL 999
-                :EndIf
-            ∇
-
-            ⍝ Close the handle
-            ∇ Close
-                :Access Public
-                →(~open)/0
-                open←0
-                {}#.IPC.Windows.CloseHandle handle
-            ∇                                              
-
-            ⍝ New pipe
-            ∇ New_ mode
-                :Access Public                
-                handle←#.IPC.Windows.CreateNamedPipeW name mode 0 255 1024 1024 0 0 
-                'Cannot create pipe'⎕SIGNAL(handle=invalidHandle)/999
-                #.IPC.Windows.ConnectNamedPipe handle 0
-                open←1
-            ∇ 
-
-            ⍝ Open pipe
-            ∇ Open_ mode;err
-                :Access Public
-                handle←#.IPC.Windows.CreateFileW name mode 3 0 3 #.IPC.Windows.FILE_ATTRIBUTE_NORMAL 0 
-                err←#.IPC.Windows.GetLastError
-                ('Cannot open pipe: ',⍕err)⎕SIGNAL(handle=invalidHandle)/999 
-                open←1
-            ∇
-
-
-            ⍝ Open for reading
-            ∇ OpenRead
-                :Access Public    
-                pipeReadWaiting←1 ⍝ so we can disregard ERROR_BAD_PIPE until the other side connects
-                :If mkNew
-                    New_ #.IPC.Windows.PIPE_ACCESS_INBOUND
-                :Else
-                    Open_ #.IPC.Windows.GENERIC_READ
-                :EndIf 
-
-            ∇                               
-
-            ⍝ Open for writing
-            ∇ OpenWrite
-                :Access Public
-                :If mkNew
-                    New_ #.IPC.Windows.PIPE_ACCESS_OUTBOUND  
-                :Else
-                    Open_ #.IPC.Windows.GENERIC_WRITE
-                :EndIf
-            ∇
-
-
+                                                        
         :EndClass       
     :EndNamespace
 
