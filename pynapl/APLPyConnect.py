@@ -473,16 +473,11 @@ class Connection(object):
             Message(Message.PID, str(os.getpid())).send(self.outfile)
             self.isSlave = True
 
-    def runUntilStop(self, asyncHandler=None):
+    def runUntilStop(self):
         """Receive messages and respond to them until STOP is received.
-        Optionally, also send messages and process them if asyncHandler
-        is set.
         """
         self.stop = False
         
-        if not asyncHandler is None:
-            asyncHandler._setAPL(self.apl)
-
         while not self.stop:
            
             sig = ignoreInterrupts()
@@ -495,10 +490,6 @@ class Connection(object):
             if not msg is None:
                 # yes, respond to it
                 self.respond(msg)
-
-            # if we have an asyncHandler, process its messages
-            if not asyncHandler is None:
-                asyncHandler._process()
 
     def expect(self, msgtype):
         """Expect a certain type of message. If such a message or an error
