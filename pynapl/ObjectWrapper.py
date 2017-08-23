@@ -10,6 +10,8 @@ from __future__ import print_function
 import sys
 import json
 
+from .ConversionInterface import Sendable, Receivable
+
 if sys.version_info.major == 2:
     bytes, str=str, unicode
 
@@ -61,7 +63,7 @@ class ObjectStore(object):
 
 
 # Wrap an object and store it in an object store
-class ObjectWrapper(object):
+class ObjectWrapper(Sendable):
     
     def __init__(self, store, obj):
         self.__store = store
@@ -87,23 +89,16 @@ class ObjectWrapper(object):
 
         return classname, va, fn
 
-    def toJSONString(self):
-        return json.dumps(self, cls=WrappedObjectEncoder, ensure_ascii=False)
+    def toJSONDict(self):
+        cls, va, fn = self.items()
+        return {"id": self.ref(), "cls": cls, "va": va, "fn": fn}
 
 # only holds a reference, but can be used to retrieve the actual object
-class ObjectRef(object):
+class ObjectRef(Receivable):
     def __init__(self, ref):
         self.ref = ref
 
     # to match the Array function.
     def to_python(self, apl):
         return apl.store.retrieve(self.ref)
-
-class WrappedObjectEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, ObjectWrapper):
-            cls, va, fn = obj.items()
-            return {"id": obj.ref(), "cls": cls, "va": va, "fn": fn}
-        else:
-            return json.JSONEncoder.default(self, obj) 
 

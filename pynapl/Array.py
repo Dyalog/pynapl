@@ -19,6 +19,7 @@ except:
 
 from .Util import *
 from .ObjectWrapper import ObjectWrapper, ObjectStore, ObjectRef
+from .ConversionInterface import Sendable, Receivable
 
 # in Python 3, the distinction between "long" and "int" doesn't exist
 # anymore
@@ -31,7 +32,7 @@ if sys.version_info.major == 2:
     str = unicode
 
 # assuming ⎕IO=0 for now
-class APLNamespace(object):
+class APLNamespace(Sendable, Receivable):
     def __init__(self, dct=None, apl=None):
         if dct is None: self.dct={}
         else: self.dct=dct
@@ -44,8 +45,8 @@ class APLNamespace(object):
     def __setitem__(self, x, val):
         self.dct[x] = APLArray.from_python(val, enclose=False, apl=self.apl)
 
-    def toJSONString(self):
-        return json.dumps(self, cls=ArrayEncoder, ensure_ascii=False)
+    def toJSONDict(self):
+        return {"ns": self.dct}
 
     # convert an APL namespace to a Python dictionary
     def to_python(self,apl=None):
@@ -74,7 +75,7 @@ class APLNamespace(object):
     def fromJSONString(string):
         return APLArray._json_decoder.decode(string)
 
-class APLObjectFactory(object):
+class APLObjectFactory(Receivable):
     """Makes an APL object."""
 
     def __init__(self, dct):
@@ -91,7 +92,7 @@ class APLObjectFactory(object):
         else:
             raise RuntimeError("Tried to use the same reference more than once.")
             
-class APLObject(object):
+class APLObject(Sendable):
     """Can be used to interact with an APL object."""
     
     def __init__(self, apl, id, va, fn):
@@ -136,12 +137,20 @@ class APLObject(object):
         except:
             pass
 
+    def toJSONDict(self):
+        return {"rid": self.__s['id']}
+
+    def to_python(self, apl=None):
+        if not apl in [None, self.__s['apl']]: 
+            raise RuntimeError("changing the APL interpreter instance out from under an object is not supported")
+
+        return self # this already is an usable object
 
             
 
 
 
-class APLArray(object):
+class APLArray(Sendable, Receivable):
     """Serializable multidimensional array.
       
     Every element of the array must be either a value or another array. 
@@ -431,28 +440,10 @@ class APLArray(object):
         # make sure that if arrays are added, they are converted transparently
         self.data[self.flatten_idx(idx)]=APLArray.from_python(val,enclose=False,apl=self.apl)
 
-    def toJSONString(self):
-        return json.dumps(self, cls=ArrayEncoder, ensure_ascii=False)
+    def toJSONDict(self):
+        return {"r": self.rho, "d": self.data, "t": self.genTypeHint()}
 
     @staticmethod 
     def fromJSONString(string):
         if type(string) is bytes: string = str(string, 'utf8')
         return APLArray._json_decoder.decode(string)
-
-# serialize an array using JSON
-class ArrayEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, APLArray):
-            return {"r": obj.rho, "d": obj.data, "t":obj.genTypeHint()}
-        elif isinstance(obj, APLNamespace):
-            return {"ns": obj.dct}
-        elif isinstance(obj, APLObject):
-            return {"rid": obj._APLObject__s['id']} 
-        elif isinstance(obj, ObjectWrapper):
-            cls, va, fn = obj.items()
-            return {"id": obj.ref(), "cls": cls, "va": va, "fn": fn}
-        elif isinstance(obj, complex):
-            return {"real": obj.real, "imag": obj.imag}
-        else:
-            return json.JSONEncoder.default(self, obj)
-
