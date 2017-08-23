@@ -728,11 +728,11 @@
         ⍝ Print debug messages
         :Field Private debugMsg←0
 
-        ⍝ Major version of Python to use. Default: 2
+        ⍝ Major version of Python to use. Default: 3
         ⍝ This only really matters for which interpreter to launch,
         ⍝ the APL side of the code does not (currently) care about the
         ⍝ difference.
-        :Field Private majorVersion←2
+        :Field Private majorVersion←3
 
         ⍝ In/Out FIFO
         :Field Private fifoIn
