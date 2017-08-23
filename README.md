@@ -227,6 +227,10 @@ the Python interpreter will stay alive as long as any of its objects
 are still around. On the Python side, the objects are stored by the
 interface, and released when all APL references to them have been removed.
 
+In some instances, some name mangling is required. Variables are exposed as
+properties on the APL side, which means that a variable `foo` will conflict
+with functions named `get_foo` and `set_foo`. In this case, those functions
+will be renamed `⍙get_foo` and `⍙set_foo`. 
 
 
 
@@ -433,6 +437,11 @@ so changes to its state are reflected on the APL side, and vice versa:
 >>> a.n
 40
 ```
+
+Members whose names are not valid names in Python can be accessed via `getattr`
+and `setattr`. Python 2 requires attribute names to be ASCII only, so members whose
+names contain non-ASCII characters cannot be accessed. Python 3 does not have
+this limitation. 
 
 #### Error handling
 

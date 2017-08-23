@@ -493,7 +493,7 @@
         ∇
 
         ⍝⍝ Make a python instance
-        ∇z←⍙MkInst (pyclass ns);cls;clstxt;va;fn;clns
+        ∇z←⍙MkInst (pyclass ns);cls;clstxt;va;fn;clns;fn_mangle
             :Access Public Shared
 
             clstxt← ⊂':Class ',ns.cls,' : #.Py.⍙PythonObject'
@@ -529,18 +529,32 @@
             :For fn :In ns.fn
                 :If '.'∊fn ⋄ :Continue ⋄ :EndIf
 
-                clstxt,←⊂ '∇{z}←{kwargs} ',fn,' args'
-                clstxt,←⊂ '  :Access Public'
-                clstxt,←⊂ '  :If 0=⎕NC''kwargs'' ⋄ kwargs←⍬ ⋄ :EndIf'
-                clstxt,←⊂ '  args←,args'
-                clstxt,←⊂ '  z←''',fn,''' ⍙Call args kwargs'
-                clstxt,←⊂ '∇'
-
                 clstxt,←⊂ '∇{z}←{kwargs} ∆',fn,' args'
                 clstxt,←⊂ '  :Access Public'
                 clstxt,←⊂ '  :If 0=⎕NC''kwargs'' ⋄ kwargs←⍬ ⋄ :EndIf'
                 clstxt,←⊂ '  args←,args'
                 clstxt,←⊂ '  z←''',fn,''' ⍙Call∆ args kwargs'
+                clstxt,←⊂ '∇'
+                
+                ⍝ Unfortunately, Dyalog APL implements property getters and setters
+                ⍝ by defining functions called 'get_property' and 'set_property'. 
+                ⍝ This means that if a variable 'foo' exists, and a function 'get_foo'
+                ⍝ also exists, this will cause a conflict on the APL side.
+                ⍝
+                ⍝ If this is the case, we mangle the function names by prepending '⍙'.
+                
+                :If (⊂4↑fn)∊'get_' 'set_'
+                :AndIf (⊂4↓fn)∊ns.va
+                    fn_mangle←'⍙',fn
+                :Else
+                    fn_mangle←fn
+                :EndIf
+                
+                clstxt,←⊂ '∇{z}←{kwargs} ',fn_mangle,' args'
+                clstxt,←⊂ '  :Access Public'
+                clstxt,←⊂ '  :If 0=⎕NC''kwargs'' ⋄ kwargs←⍬ ⋄ :EndIf'
+                clstxt,←⊂ '  args←,args'
+                clstxt,←⊂ '  z←''',fn,''' ⍙Call args kwargs'
                 clstxt,←⊂ '∇'
             :EndFor
 
