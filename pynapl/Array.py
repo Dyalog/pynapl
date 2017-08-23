@@ -100,7 +100,7 @@ class APLObject(object):
         # create function stubs
         for f in fn:
             fname=f
-            # In Python 2, f must be encoded - this is lossy, so APL class members that
+            # In Python 2, f must be ASCII-encoded - this is lossy, so APL class members that
             # have non-ASCII names get their names mangled
             if sys.version_info.major == 2:
                 fname=f.encode('ascii','replace')
@@ -203,7 +203,12 @@ class APLArray(object):
         elif len(self.rho)==1: # array
             # if the type hint says characters, and the array is simple, return a string
             if self.genTypeHint() == APLArray.TYPE_HINT_CHAR \
-            and not any(isinstance(x, APLArray) or isinstance(x, APLNamespace) for x in self.data):
+            and not any(isinstance(x, APLArray) 
+                     or isinstance(x, APLNamespace) 
+                     or isinstance(x, ObjectRef)
+                     or isinstance(x, APLObject)
+                     or isinstance(x, APLObjectFactory)
+                     for x in self.data):
                 return ''.join(self.data)
 
             # if not, return a list. If this is a nested array that _does_ have a simple
