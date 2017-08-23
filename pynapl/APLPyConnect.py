@@ -141,9 +141,6 @@ class Message(object):
         available, rather than wait until one comes in.
         """
 
-        # unfortunately, we have to pass the socket in separately, as Python 3
-        # no longer allows using select.select on a socket file
-
         s = None
         setsgn = False
         
@@ -151,15 +148,10 @@ class Message(object):
             if block:
                 # wait for message available
                 while True:
-                    #ready = select.select([reader], [], [], 0.1)
-                    #if ready[0]: break
                     if reader.avail(0.1): break
             else:
                 # if no message available, return None
                 if not reader.avail(0.1): return None
-
-                #ready = select.select([reader], [], [], 0.1)
-                #if not ready[0]: return None
 
                 # once we've started reading, finish reading: turn off the interrupt handler
             try:
@@ -176,7 +168,7 @@ class Message(object):
                 lfield = list(map(maybe_ord, reader.read(4)))
                 length = (lfield[0]<<24) + (lfield[1]<<16) + (lfield[2]<<8) + lfield[3]
             except (TypeError, IndexError, ValueError):
-                raise #MalformedMessage("out of data while reading message header")
+                raise MalformedMessage("out of data while reading message header")
 
             # read the data
             try:
@@ -197,9 +189,6 @@ class Message(object):
 
 class Connection(object):
     """A connection"""
-
-    
-    #pid=None
 
     class APL(object):
         """Represents the APL interpreter."""
@@ -239,8 +228,7 @@ class Connection(object):
                     self.conn.infile.close()
                     self.conn.outfile.close()
                 except:
-                    raise
-                    pass # we're gone anyway.
+                    pass # we're gone anyway
 
                 # give the APL process half a second to exit cleanly
                 time.sleep(.5)
@@ -313,7 +301,7 @@ class Connection(object):
                         self.eval("%s ← (py.PyFn'APL.%s').Call⋄⍬" % (wsname, wsname))
                 else:
                     # it is a value
-                    self.eval("%s ← ⊃∆⋄⍬" % wsname, arg) 
+                    self.eval("%s ← ⊃∆" % wsname, arg) 
                 return wsname
 
             def __op(aa, ww=None, raw=False):
@@ -406,8 +394,6 @@ class Connection(object):
                          .replace('{⋄','{').replace('⋄}','}') \
                          .replace('(⋄','(').replace('⋄)',')')
 
-            # print "evaluating: ", aplexpr
-
             payload = APLArray.from_python([aplexpr, args], self).toJSONString()
             Message(Message.EVAL, payload).send(self.conn.outfile)
 
@@ -479,8 +465,6 @@ class Connection(object):
             return apl
 
     def __init__(self, infile, outfile, signon=True):
-        #self.socket = socket
-        # self.sockfile = socket.makefile('rwb')
         self.infile=infile
         self.outfile=outfile
         self.apl = Connection.APL(self)
@@ -499,9 +483,6 @@ class Connection(object):
         if not asyncHandler is None:
             asyncHandler._setAPL(self.apl)
 
-        # we are not interruptible
-        #sig = ignoreInterrupts()
-
         while not self.stop:
            
             sig = ignoreInterrupts()
@@ -514,7 +495,6 @@ class Connection(object):
             if not msg is None:
                 # yes, respond to it
                 self.respond(msg)
-                #self.respond(Message.recv(self.sockfile,self.socket))
 
             # if we have an asyncHandler, process its messages
             if not asyncHandler is None:
