@@ -42,11 +42,11 @@ class, namely:
 
 | Option | Argument | Purpose |
 | --- | --- | --- |
-| `Attach` | ignored | Do not start up a Python instance, but allow attachment to one that is already running. A port number will be given, and it will wait for a connection from the Python side. The Python side can be told to connect using `APL.client(port)`. |
-| `ForceTCP` | boolean | Use TCP mode even on Unix. |
+| `Attach` | ignored | Do not start up a Python instance, but allow attachment to one that is already running. An input and output pipe will be given (or a port number in TCP mode), and it will wait for a connection from the Python side. The Python side can be told to connect using `APL.client(in,out)` (or `APL.tcpclient(port)`). |
+| `ForceTCP` | boolean | Use TCP mode even on Unix. This may be necessary for non-standard interpreters. |
 | `PyPath` | path to an interpreter | Start the Python interpreter given in the argument, instead of the system one. |
 | `ArgFmt` | string, where `⍎` will be replaced by the path to the slave script, `→` by the input pipe file (or `TCP` if in TCP mode), and `←` by the output pipe file (or port number if in TCP mode) | When used in combination with `PyPath`, use a custom argument format rather than the standard one. |
-| `Version` | major Python version (2 or 3) | Start either a Python 2 or 3 interpreter, depending on which is given. The default is currently 2. |
+| `Version` | major Python version (2 or 3) | Start either a Python 2 or 3 interpreter, depending on which is given. The default is currently 3. |
 | `Debug` | boolean | If the boolean is 1, turns on debug messages and also does not start up a Python instance. |
 | `NoInterrupts` | boolean | Turns off interrupts in the interface code. This disables the ability to interrupt running Python code, but makes sure that any interrupts are caught by your own code and not by the interface. |
 
@@ -54,7 +54,7 @@ class, namely:
 In particular, the following might be of interest:
 
 ```apl
-py ← ⎕NEW Py.Py('Version' 3) ⍝ use Python 3 instead of 2
+py ← ⎕NEW Py.Py('Version' 2) ⍝ use Python 2 instead of 3
 ```
 
 ```apl
@@ -185,7 +185,7 @@ attributes corresponding to the Python ones.
       py.Exec'import sys'
       sys←py.Eval'sys'
       sys.version_info
-2 7 13  final  0
+3 5 3  final  0
 
       5↑sys.⎕NL¯2
  __doc__  __name__  __package__  __stderr__  __stdin__ 
@@ -381,6 +381,59 @@ If an APL operator is applied to an APL function via Python,
 as in the `apl_sumscan` example, this is detected, and the application
 is done in APL without calling back into Python. 
 
+#### Using APL objects from Python
+
+Just as APL may make use of Python objects, Python may make use of
+APL objects.
+
+If a call to `eval` or to an APL function returns an instance of an
+APL object, it is represented on the Python side by an instance of the
+`APLObject` class, in which public functions and variables will appear
+as attributes.
+
+```
+>>> apl.fix("""
+... :Class foo
+...    :Field Public n←0
+...    ∇x←getN
+...       :Access Public
+...       x←n
+...    ∇
+...    ∇setN x
+...       :Access Public
+...       n←x
+...    ∇
+... :EndClass
+... """)
+['foo']
+>>> a = apl.eval("+a ← ⎕NEW foo")
+>>> a
+<pynapl.Array.APLObject object at 0x7f1d3a9e0ac8>
+>>> a.n
+0
+>>> a.getN()
+0
+>>> a.setN(20)
+[]
+>>> a.n
+20
+>>> a.n = 30
+>>> a.getN()
+30
+```
+
+The `APLObject` class contains a reference to the object on the APL side,
+so changes to its state are reflected on the APL side, and vice versa:
+
+```
+>>> apl.eval("a.n")
+30
+>>> apl.eval("a.n←40")
+40
+>>> a.n
+40
+```
+
 #### Error handling
 
 If a signal is raised by the APL code, an APLError will be raised
@@ -543,7 +596,7 @@ Python side:
 >>> 2+2
  # this evaluates to 4
  # Python sends to APL: EVALRET 4
-http://localhost:8888/notebooks/Untitled4.ipynb?kernel_name=apl
+
 APL side:
  ⍝ receives EVALRET 4
      2 + 4
