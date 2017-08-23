@@ -155,7 +155,6 @@ def dystart(inf, outf, dyalog=None):
             else:
                 dyalog=b"dyalog" # assume it's just on the path, in a normal Unix installation
         
-        #thread.start_new_thread(posix_dythread, (port,), {"dyalog":dyalog})
         t=threading.Thread(target=lambda:posix_dythread(inf,outf,dyalog=dyalog))
         t.daemon=True
         t.start()
@@ -180,15 +179,12 @@ def dystart(inf, outf, dyalog=None):
                 :EndNamespace
             """%int(outf)))
        
-        #thread.start_new_thread(win_dythread, (), {"dyalog":dyalog, 
-        #                    'cygwin':'CYGWIN' in platform.system()})
         t=threading.Thread(
                        target=lambda:win_dythread(dyalog=dyalog,
                        cygwin='CYGWIN' in platform.system()))
 
         t.daemon=True
         t.start()
-        #Popen([dyalog, 'WinPySlave.dyapp'], stdin=None, stdout=None, stderr=None, close_fds=True)
         
     else:
         raise RuntimeError("OS not supported: " + os.name)
