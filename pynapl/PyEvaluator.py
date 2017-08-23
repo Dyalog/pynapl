@@ -90,10 +90,7 @@ class PyEvaluator(object):
             if ch in u'⎕⍞':
                 build.append(u'args[%d]' % narg)
                 curarg = self.args[[narg]]
-                if ch==u'⎕' and (isinstance(curarg,APLArray) 
-                              or isinstance(curarg,APLNamespace)
-                              or isinstance(curarg,APLObjectFactory)
-                              or isinstance(curarg,ObjectRef)):
+                if ch==u'⎕' and (isinstance(curarg,Receivable)):
                     # this argument should be converted to a suitable Python representation
                     self.pyargs.append(curarg.to_python(self.conn.apl))
                 else:

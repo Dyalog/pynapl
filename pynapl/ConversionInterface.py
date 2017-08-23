@@ -9,9 +9,6 @@ import json
 
 # Any object that can do from_python will inherit from this class
 class Sendable(object):
-    def from_python(self, apl=None):
-        raise NotImplemented()
-
     def toJSONDict(self):
         raise NotImplemented()
 

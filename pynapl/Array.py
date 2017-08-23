@@ -53,10 +53,7 @@ class APLNamespace(Sendable, Receivable):
         newdct = {}
         for x in self.dct:
             obj = self.dct[x]
-            if isinstance(obj, APLArray) \
-            or isinstance(obj, APLNamespace) \
-            or isinstance(obj, APLObjectFactory) \
-            or isinstance(obj, ObjectRef):
+            if isinstance(obj, Receivable):
                 newdct[x] = obj.to_python(apl)
             else:
                 newdct[x] = obj
@@ -145,11 +142,7 @@ class APLObject(Sendable):
             raise RuntimeError("changing the APL interpreter instance out from under an object is not supported")
 
         return self # this already is an usable object
-
-            
-
-
-
+    
 class APLArray(Sendable, Receivable):
     """Serializable multidimensional array.
       
@@ -203,21 +196,13 @@ class APLArray(Sendable, Receivable):
 
         if len(self.rho)==0: # scalar
             scalar = self.data[0]
-            if isinstance(scalar, APLArray): return scalar.to_python(apl)
-            elif isinstance(scalar, APLNamespace): return scalar.to_python(apl)
-            elif isinstance(scalar, ObjectRef): return scalar.to_python(apl)
-            elif isinstance(scalar, APLObjectFactory): return scalar.to_python(apl)
+            if isinstance(scalar, Receivable): return scalar.to_python(apl)
             else: return scalar
 
         elif len(self.rho)==1: # array
             # if the type hint says characters, and the array is simple, return a string
             if self.genTypeHint() == APLArray.TYPE_HINT_CHAR \
-            and not any(isinstance(x, APLArray) 
-                     or isinstance(x, APLNamespace) 
-                     or isinstance(x, ObjectRef)
-                     or isinstance(x, APLObject)
-                     or isinstance(x, APLObjectFactory)
-                     for x in self.data):
+            and not any(isinstance(x, (Sendable, Receivable)) for x in self.data):
                 return ''.join(self.data)
 
             # if not, return a list. If this is a nested array that _does_ have a simple
@@ -226,10 +211,7 @@ class APLArray(Sendable, Receivable):
             else:
                 pylist = []
                 for item in self.data:
-                    if isinstance(item,APLArray) \
-                    or isinstance(item,APLNamespace) \
-                    or isinstance(item,APLObjectFactory) \
-                    or isinstance(item,ObjectRef):
+                    if isinstance(item,Receivable):
                         item=item.to_python(apl)
                     
                     pylist.append(item)
@@ -271,10 +253,7 @@ class APLArray(Sendable, Receivable):
                 l = [APLArray.from_python(x,False,apl) for x in l]
                 return APLArray(rho=shape, data=l, apl=apl)
 
-        if isinstance(obj, APLArray) \
-        or isinstance(obj, APLNamespace) \
-        or isinstance(obj, APLObject) \
-        or isinstance(obj, ObjectWrapper):
+        if isinstance(obj, Sendable):
             return obj # it already is of the right type
 
         if type(obj) is dict:
