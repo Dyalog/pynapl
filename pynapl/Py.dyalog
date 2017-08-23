@@ -61,7 +61,7 @@
 
     :Class JSONSerializer
         :Field Public Instance pyclass
-        
+
         ⍝ deserialize
         ∇ r←pyclass deserialize json
             :Access Public Shared
@@ -139,7 +139,7 @@
             :Implements Constructor
             pyclass←pyc
         ∇
-        
+
         ⍝ serialize
         ∇ r←pyclass serialize obj;enc;ns;encr
             :Access Public Shared
@@ -184,7 +184,6 @@
                 ⍝ try to encode it using the pyclass
                 r←taboo encode (pyclass.Obj obj)
                 :Return
-                ⍝⎕SIGNAL⊂('EN' 6)('Message' 'Only values and namespaces containing values can be serialized.')
             :EndIf
 
             :If 0=≡obj
@@ -709,8 +708,6 @@
         :Field Private BUGERR←15  ⍝ error raised when the cause is an internal bug
 
         :Field Private ready←0
-        :Field Private serverSocket←⍬
-        :Field Private connSocket←⍬
         :Field Private pid←¯1
         :Field Private os
 
@@ -736,17 +733,6 @@
         ⍝ the APL side of the code does not (currently) care about the
         ⍝ difference.
         :Field Private majorVersion←2
-
-        ⍝ Holds expect token number. The async thread will only try to
-        ⍝ receive when this token is available.
-        :Field Private expectToken←⍬
-
-        ⍝ Holds read token number.
-        :Field Private readToken←⍬
-
-        ⍝ If we have spawned a thread for asynchronous message handling,
-        ⍝ this will hold its ID.
-        :Field Private asyncThread←⍬
 
         ⍝ In/Out FIFO
         :Field Private fifoIn
@@ -784,13 +770,6 @@
 
         ⍝ JSON serialization/deserialization
         :Section JSON serialization/deserialization
-            ⍝ Check whether an array is serializable
-            serializable←{
-                ⍝ for an array to be serializable, each of its elements
-                ⍝ when assigned to a variable must result in ⎕NC=2
-                ⊃2∧.={w←⍵ ⋄ ⎕NC'w'}¨∊⍵
-            }
-
             ⍝ Serialize a (possibly nested) array
             serialize←{⎕THIS #.Py.JSONSerializer.serialize ⍵}
 
@@ -836,15 +815,6 @@
                 DBG←254
                 ERR←255
             :EndNamespace
-
-            :Field Private attempts←10
-            :Field Private curdata←⍬
-            :Field Private curlen←¯1
-            :Field Private curtype←¯1
-            :Field Private reading←0
-
-            :Field Private expectDepth←0
-
 
             ⍝ Run a client on a given a port
             ∇ RunClient (in out);rv;ok;msg;data
@@ -922,8 +892,6 @@
             ⍝ Expect a message
             ⍝ Returns (type,data) for a message.
             ∇ (type data)←Expect msgtype;ok
-                ⍝ TODO: this will handle incoming messages arising from
-                ⍝ a sent message if applicable
                 :Repeat
                     ok type data←URecv 0
 
@@ -943,8 +911,6 @@
                             ⍝ if we are interrupted during HandleMsg, that means
                             ⍝ the APL side has been interrupted, and we need to tell
                             ⍝ Python this
-
-
                             type HandleMsg data
                         :Else
                             Msgs.ERR USend #.Py.MSGErr 'Interrupt'
@@ -974,7 +940,7 @@
 
 
                         readhdr:
-                        ⍝ explicitly allow traps in here unless they are turne doff
+                        ⍝ explicitly allow traps in here unless they are turned off
                         {}2503⌶noInterrupts
                         header←fifoIn.Read 5
 
@@ -1018,10 +984,6 @@
                 {}2503⌶tS
             ∇
         :EndSection
-
-
-
-
 
         ⍝ Handle an incoming message
         ∇ mtype HandleMsg mdata;in;expr;args;ns;rslt;lines;tS
@@ -1306,9 +1268,6 @@
         ∇ InitServer (startAsync argfmt forceTCP);ok;tries;code;clt;success;_;msg;srvport;piducs;spath;if;of
             InitCommon
             signalPython←1
-
-            ⍝ Attempt to start a server
-            ⍝ srvport←StartServer
 
             ⍝ If we're on Windows, always use TCP
             :If ∨/'Windows'⍷⊃#.⎕WG'APLVersion'
