@@ -95,7 +95,43 @@ class TestAPL(unittest.TestCase):
         self.assertEqual(["Test"], names)
         self.assertEqual(42, self.apl.eval("Test.foo"))
 
+    def test_apl_objects(self):
+        """Transfer APL objects to Python"""
+        
+        self.apl.fix("""
+        :Class Foo
+            :Field Public n←42
+            ∇init x
+                :Access Public
+                :Implements Constructor
+                n←x
+            ∇
+        :EndClass
+        """)
 
+        foo = self.apl.eval("+foo←⎕NEW Foo 42")  # store object on both sides
+        
+        self.assertEqual(foo.n, 42)              # the object must contain 42
+        foo.n = 88                               # we must be able to change it
+        self.assertEqual(foo.n, 88)              # the change must stick
+        self.assertEqual(88, self.apl.eval("foo.n"))  # and must be reflected in APL
+        
+        # we must be able to pass the ref back to APL, where it must resolve to exactly the
+        # same object
+        self.assertTrue(self.apl.fn("{foo≡⍵}")(foo))
+        
+        bar = self.apl.eval("⎕NEW Foo 99")       # make a new object and don't store it in APL
+        self.assertEqual(bar.n, 99)              # it must transfer through
+        self.assertEqual(foo.n, 88)              # it must not have changed the other one
+        bar.n = 77                               # we must be able to change it
+        self.assertEqual(bar.n, 77)              # the change must stick
+        self.assertEqual(foo.n, 88)              # and not affect the other one
+
+        # we must be able to pass the ref back to APL and use it
+        self.assertEqual(77, self.apl.fn('{⍵.n}')(bar))
+
+        self.apl.fn('{⍵.n←66}')(bar)             # and we must be able to change it there
+        self.assertEqual(66, bar.n)              # and the change must be reflected in Python
 
 
         
