@@ -81,8 +81,8 @@ class ObjectWrapper(Sendable):
 
         for attr in dir(obj):
 
-            item = getattr(obj, attr)
             try:
+                item = getattr(obj, attr)
                 if hasattr(item,'__call__'):
                     fn.append(attr)
                 else:
@@ -94,6 +94,11 @@ class ObjectWrapper(Sendable):
                 # pokes everything, it would trap all of that, so we catch
                 # ImportError and ignore it. If something could not be imported,
                 # it is simply not included in the list of attributes. 
+                pass
+            except AttributeError:
+                # Some objects claim to have attributes (via `dir`), but then raise
+                # AttributeError when you actually try to access them. These are
+                # also ignored.
                 pass
 
         return classname, va, fn

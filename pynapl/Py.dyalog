@@ -1122,15 +1122,21 @@
         ⍝ Import a Python module and return it as an APL object
         ∇ {obj}←Import module
             :Access Public
-            Exec'import ',module
-            obj←Eval module
+            :Trap 0 1000
+                Exec'import ',module
+                obj←Eval module
+            :Else ⋄ ⎕SIGNAL⊂('EN'(⎕DMX.EN))('Message'(⎕DMX.Message))
+            :EndTrap
         ∇
 
         ⍝ Import from
         ∇ {obj}←ImportFrom (module child)
             :Access Public
-            Exec'from ',module,' import ',child
-            obj←Eval child
+            :Trap 0 1000
+                Exec'from ',module,' import ',child
+                obj←Eval child
+            :Else ⋄ ⎕SIGNAL⊂('EN'(⎕DMX.EN))('Message'(⎕DMX.Message))
+            :EndTrap
         ∇
 
         ⍝ expose a Python function as a monadic APL "function" (using a namespace)
