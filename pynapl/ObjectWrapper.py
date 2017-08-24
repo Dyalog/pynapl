@@ -87,7 +87,7 @@ class ObjectWrapper(Sendable):
                     fn.append(attr)
                 else:
                     va.append(attr)
-            except ImportError:
+            except (ImportError, NotImplementedError):
                 # There are modules which import other modules conditionally,
                 # which aren't necessarily available, but which would only give
                 # an error if you actually tried to use it. Since this wrapper

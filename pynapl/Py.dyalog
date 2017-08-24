@@ -502,19 +502,31 @@
             clstxt,←⊂ '∇ ⍙init(pyclass ns)'
             clstxt,←⊂ '  :Access Public'
             clstxt,←⊂ '  :Implements Constructor :Base (pyclass ns)'
-            clstxt,←⊂ '  :Trap 0 100 ⋄ ⎕DF ''repr(⎕)'' pyclass.Eval ⎕THIS ⋄ :Else ⋄ ⎕SIGNAL ⍙MkErr⎕DMX ⋄ :EndTrap'
+            clstxt,←(~pyclass.noDF)/⊂ '  :Trap 0 1000 ⋄ ⎕DF ''repr(⎕)'' pyclass.Eval ⎕THIS ⋄ :Else ⋄ ⎕SIGNAL ⍙MkErr⎕DMX ⋄ :EndTrap'
             clstxt,←⊂ '∇'
 
+            ⍝ add a field by which we can retrieve the class name
+            clstxt,←⊂ ':Field Public ⍙CLASSNAME←''',ns.cls,''''
+            
             ⍝ add in properties for all the variables
             :For va :In ns.va
                 :If '.'∊va ⋄ :Continue ⋄ :EndIf
+                
+                ⍝ add in a cache field
+                clstxt,←⊂ ':Field Private ⍙CACHE⍙',va,'←⍬'
+                
                 clstxt,←⊂ ':Property ',va
                 clstxt,←⊂ ':Access Public'
                 clstxt,←⊂ '∇ r←get'
+                ⍝clstxt,←⊂ '  :If ⍙CACHE⍙',va,'≢⍬ ⋄ r←⍙CACHE⍙',va,' ⋄ →0 ⋄ :EndIf' ⍝ use cache if it's there
                 clstxt,←⊂ '  :Trap 0 1000 ⋄ r←⍙Get ''',va,''' ⋄ :Else ⋄ ⎕SIGNAL ⍙MkErr⎕DMX ⋄ :EndTrap'
+                ⍝clstxt,←⊂ '  →(0=⎕NC⊂''r.⍙CLASSNAME'')/0' ⍝ if not a Python object, no cache
+                ⍝clstxt,←⊂ '  →(r.⍙CLASSNAME≢''module'')/0' ⍝ if not a Python module, no cache
+                ⍝clstxt,←⊂ '  ⍙CACHE⍙',va,'←r'
                 clstxt,←⊂ '∇'
                 clstxt,←⊂ '∇ set v'
                 clstxt,←⊂ '  :Trap 0 1000 ⋄ ''',va,''' ⍙Set v.NewValue ⋄ :Else ⋄ ⎕SIGNAL ⍙MkErr⎕DMX ⋄ :EndTrap'
+                ⍝clstxt,←⊂ '  ⍙CACHE⍙',va,'←⍬'
                 clstxt,←⊂ '∇'
                 clstxt,←⊂ ':EndProperty'
 
@@ -723,6 +735,8 @@
 
         when←/⍨
 
+        :Field Public noDF←0      ⍝ boolean that decides whether ⎕DF should be set to repr(⎕) on Python classes. 
+        
         ⍝ errors
         :Field Private PYERR←11   ⍝ error raised when Python returns an error
         :Field Private BROKEN←990 ⍝ error raised when the object is not in an usable state
@@ -1398,6 +1412,8 @@
                 :Case 'ForceTCP' ⋄ forceTCP←val
                     ⍝ disallow interrupts
                 :Case 'NoInterrupts' ⋄ noInterrupts←val 
+                    ⍝ disable display forms
+                :Case 'NoDF' ⋄ noDF←val
                 :EndSelect
 
             :EndFor
