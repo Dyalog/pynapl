@@ -642,6 +642,15 @@
 
             z←'APL.obj(getattr(APL._access(⎕),⎕)(*⎕,**⎕))' ⍙py.Eval ⍙id fname args kwargs
         ∇
+        
+        ⍝ Update DF to be the object's __repr__
+        ∇{z}←⍙DF
+            :Access Public
+            :Trap 0 1000
+                z←'repr(APL._access(⎕))' ⍙py.Eval ⊂⍙id
+                ⎕DF z
+            :EndTrap
+        ∇
 
     :EndClass
 
