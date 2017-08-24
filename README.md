@@ -49,7 +49,7 @@ class, namely:
 | `Version` | major Python version (2 or 3) | Start either a Python 2 or 3 interpreter, depending on which is given. The default is currently 3. |
 | `Debug` | boolean | If the boolean is 1, turns on debug messages and also does not start up a Python instance. |
 | `NoInterrupts` | boolean | Turns off interrupts in the interface code. This disables the ability to interrupt running Python code, but makes sure that any interrupts are caught by your own code and not by the interface. |
-
+| `NoDF` | boolean | Turns off automatically setting ⎕DF when importing Python objects. This saves a repr() call (from APL) per object. |
 
 In particular, the following might be of interest:
 
@@ -232,6 +232,29 @@ properties on the APL side, which means that a variable `foo` will conflict
 with functions named `get_foo` and `set_foo`. In this case, those functions
 will be renamed `⍙get_foo` and `⍙set_foo`. 
 
+In APL, a Python object reference will have the following members:
+
+ - Properties:
+    - `foo`: for each non-callable attribute in the object, gets or sets that attribute
+    - `∆foo`: for each non-callable attribute in the object, gets that attribute
+               without object translation (i.e., will _always_ return a Python
+               object, even for lists and numbers).
+ - Functions:
+    - `foo`: for each callable attribute in the object, calls it and returns the result. 
+    - `∆foo`: for each callable attribute in the object, calls it and returns the result
+               without object translation.
+
+    - `⍙DF`: returns the string representation of the object (using `repr`), and also sets
+              the display form to it.
+    - `⍙Get`: retrieves an attribute, given as a character vector as the right argument
+    - `⍙Get∆`: retrieves an attribute, given as a character vector as the right argument,
+                without object translation on the result.
+    - `⍙Set`: sets the attribute (left argument) to the value given as the right argument
+    - `⍙SetRaw`: sets the attribute (left argument) to the value given as the right argument,
+                  using `⍞` instead of `⎕`.
+    - `⍙Call`: calls the function (left argument) with the given positional and keyword arguments
+                 (right argument, both must be present).
+    - `⍙Call∆`: like `⍙Call`, but without object translation on the result.
 
 
 #### Error handling
