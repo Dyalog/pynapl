@@ -235,13 +235,13 @@ will be renamed `⍙get_foo` and `⍙set_foo`.
 In APL, a Python object reference will have the following members:
 
  - Properties:
-    - `foo`: for each non-callable attribute in the object, gets or sets that attribute
-    - `∆foo`: for each non-callable attribute in the object, gets that attribute
+    - `foo`: for each non-callable attribute `foo` in the object, gets or sets that attribute
+    - `∆foo`: for each non-callable attribute `foo` in the object, gets that attribute
                without object translation (i.e., will _always_ return a Python
                object, even for lists and numbers).
  - Functions:
-    - `foo`: for each callable attribute in the object, calls it and returns the result. 
-    - `∆foo`: for each callable attribute in the object, calls it and returns the result
+    - `bar`: for each callable attribute `bar` in the object, calls it and returns the result. 
+    - `∆bar`: for each callable attribute `bar` in the object, calls it and returns the result
                without object translation.
 
     - `⍙DF`: returns the string representation of the object (using `repr`), and also sets
