@@ -502,6 +502,7 @@
             clstxt,←⊂ '∇ ⍙init(pyclass ns)'
             clstxt,←⊂ '  :Access Public'
             clstxt,←⊂ '  :Implements Constructor :Base (pyclass ns)'
+            clstxt,←⊂ '  :Trap 0 100 ⋄ ⎕DF ''repr(⎕)'' pyclass.Eval ⎕THIS ⋄ :Else ⋄ ⎕SIGNAL ⍙MkErr⎕DMX ⋄ :EndTrap'
             clstxt,←⊂ '∇'
 
             ⍝ add in properties for all the variables
@@ -510,17 +511,17 @@
                 clstxt,←⊂ ':Property ',va
                 clstxt,←⊂ ':Access Public'
                 clstxt,←⊂ '∇ r←get'
-                clstxt,←⊂ '  r←⍙Get ''',va,''''
+                clstxt,←⊂ '  :Trap 0 1000 ⋄ r←⍙Get ''',va,''' ⋄ :Else ⋄ ⎕SIGNAL ⍙MkErr⎕DMX ⋄ :EndTrap'
                 clstxt,←⊂ '∇'
                 clstxt,←⊂ '∇ set v'
-                clstxt,←⊂ '  ''',va,''' ⍙Set v.NewValue'
+                clstxt,←⊂ '  :Trap 0 1000 ⋄ ''',va,''' ⍙Set v.NewValue ⋄ :Else ⋄ ⎕SIGNAL ⍙MkErr⎕DMX ⋄ :EndTrap'
                 clstxt,←⊂ '∇'
                 clstxt,←⊂ ':EndProperty'
 
                 clstxt,←⊂ ':Property ∆',va
                 clstxt,←⊂ ':Access Public'
                 clstxt,←⊂ '∇ r←get'
-                clstxt,←⊂ '  r←⍙Get∆ ''',va,''''
+                clstxt,←⊂ '  :Trap 0 1000 ⋄ r←⍙Get∆ ''',va,''' ⋄ :Else ⋄ ⎕SIGNAL ⍙MkErr⎕DMX ⋄ :EndTrap'
                 clstxt,←⊂ '∇'
                 clstxt,←⊂ ':EndProperty'
             :EndFor
@@ -533,28 +534,28 @@
                 clstxt,←⊂ '  :Access Public'
                 clstxt,←⊂ '  :If 0=⎕NC''kwargs'' ⋄ kwargs←⍬ ⋄ :EndIf'
                 clstxt,←⊂ '  args←,args'
-                clstxt,←⊂ '  z←''',fn,''' ⍙Call∆ args kwargs'
+                clstxt,←⊂ '  :Trap 0 1000 ⋄ z←''',fn,''' ⍙Call∆ args kwargs ⋄ :Else ⋄ ⎕SIGNAL ⍙MkErr⎕DMX ⋄ :EndTrap'
                 clstxt,←⊂ '∇'
-                
+
                 ⍝ Unfortunately, Dyalog APL implements property getters and setters
                 ⍝ by defining functions called 'get_property' and 'set_property'. 
                 ⍝ This means that if a variable 'foo' exists, and a function 'get_foo'
                 ⍝ also exists, this will cause a conflict on the APL side.
                 ⍝
                 ⍝ If this is the case, we mangle the function names by prepending '⍙'.
-                
+
                 :If (⊂4↑fn)∊'get_' 'set_'
                 :AndIf (⊂4↓fn)∊ns.va
                     fn_mangle←'⍙',fn
                 :Else
                     fn_mangle←fn
                 :EndIf
-                
+
                 clstxt,←⊂ '∇{z}←{kwargs} ',fn_mangle,' args'
                 clstxt,←⊂ '  :Access Public'
                 clstxt,←⊂ '  :If 0=⎕NC''kwargs'' ⋄ kwargs←⍬ ⋄ :EndIf'
                 clstxt,←⊂ '  args←,args'
-                clstxt,←⊂ '  z←''',fn,''' ⍙Call args kwargs'
+                clstxt,←⊂ '  :Trap 0 1000 ⋄ z←''',fn,''' ⍙Call args kwargs ⋄ :Else ⋄ ⎕SIGNAL ⍙MkErr⎕DMX ⋄ :EndTrap'
                 clstxt,←⊂ '∇'
             :EndFor
 
@@ -611,6 +612,12 @@
             :EndIf
 
             z←'getattr(APL._access(⎕),⎕)(*⎕,**⎕)' ⍙py.Eval ⍙id fname args kwargs
+        ∇
+
+        ⍝ Make an error message
+        ∇err←⍙MkErr dmx
+            :Access Public
+            err←⊂('EN'(dmx.EN))('Message'(dmx.Message))
         ∇
 
         ⍝ Call Functions
