@@ -2,14 +2,14 @@ from setuptools import setup
 
 setup(
         name="Py'n'APL",
-        version='0.0.5.dev1',
+        version='0.1.0',
         
         description='Python - Dyalog APL interface',
         long_description="""
 This package allows communication between Python and Dyalog APL.
 """,
         
-        url='TODO',
+        url='https://github.com/marinuso/pynapl',
         
         author='TODO',
         author_email='TODO',
