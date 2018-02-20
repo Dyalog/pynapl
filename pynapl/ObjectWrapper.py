@@ -95,10 +95,12 @@ class ObjectWrapper(Sendable):
                 # ImportError and ignore it. If something could not be imported,
                 # it is simply not included in the list of attributes. 
                 pass
-            except AttributeError:
+            except (AttributeError, KeyError):
                 # Some objects claim to have attributes (via `dir`), but then raise
                 # AttributeError when you actually try to access them. These are
                 # also ignored.
+                # Some objects with custom __getattr__ methods wrongly raise
+                # KeyError instead of AttributeError.
                 pass
 
         return classname, va, fn
