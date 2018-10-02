@@ -55,12 +55,12 @@
                 n←'TCP/IP'
             ∇
 
-            ∇Connect (host port);rv
+            ∇Connect (host port);rc;name
                 :Access Public
-                rv←#.DRC.Clt '' host port 'Raw'
-                :If 0=⊃rv
+                (rc name)←#.DRC.Clt '' host port 'Raw'
+                :If rc=0
                     ⍝ connection established
-                    socket←2⊃rv
+                    socket←name
                     ready←1
                 :Else
                     ⍝ failure
@@ -69,13 +69,13 @@
             ∇
 
             ⍝Start a server
-            ∇port←StartServer;tryPort;rv
+            ∇port←StartServer;tryPort;rc;name
                 :Access Public
                 :For tryPort :In ⌽⍳65535
-                    rv←#.DRC.Srv '' 'localhost' tryPort 'Raw'
-                    :If 0=⊃rv
+                    (rc name)←#.DRC.Srv '' 'localhost' tryPort 'Raw'
+                    :If rc=0
                         port←tryPort
-                        srvsock←2⊃rv
+                        srvsock←name
                         :Return
                     :EndIf
                 :EndFor
@@ -84,12 +84,12 @@
             ∇
 
             ⍝ Wait for a connection
-            ∇AcceptConnection;rc;rval
+            ∇AcceptConnection;rval;rc;obj;event;data
                 :Access Public
                 :Repeat
-                    rc←⊃rval←#.DRC.Wait srvsock
+                    (rc obj event data)←rval←#.DRC.Wait srvsock
                     :If rc=0
-                        socket←2⊃rval
+                        socket←obj
                         ready←1
                         :Leave
                     :ElseIf rc=100
