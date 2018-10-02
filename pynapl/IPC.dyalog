@@ -57,7 +57,7 @@
 
             ∇Connect (host port);rc;name
                 :Access Public
-                (rc name)←#.DRC.Clt '' host port 'Raw'
+                (rc name)←2↑#.DRC.Clt '' host port 'Raw'
                 :If rc=0
                     ⍝ connection established
                     socket←name
@@ -72,7 +72,7 @@
             ∇port←StartServer;tryPort;rc;name
                 :Access Public
                 :For tryPort :In ⌽⍳65535
-                    (rc name)←#.DRC.Srv '' 'localhost' tryPort 'Raw'
+                    (rc name)←2↑#.DRC.Srv '' 'localhost' tryPort 'Raw'
                     :If rc=0
                         port←tryPort
                         srvsock←name
@@ -84,10 +84,10 @@
             ∇
 
             ⍝ Wait for a connection
-            ∇AcceptConnection;rval;rc;obj;event;data
+            ∇AcceptConnection;rval;rc;obj
                 :Access Public
                 :Repeat
-                    (rc obj event data)←rval←#.DRC.Wait srvsock
+                    (rc obj)←2↑rval←#.DRC.Wait srvsock
                     :If rc=0
                         socket←obj
                         ready←1
