@@ -641,3 +641,26 @@ Python side:
 >>> x
 6
 ```
+
+## Testing
+
+To run unit tests from Python:
+```sh
+$ python2 -m unittest pynapl.test.test_APL pynapl.test.test_Array
+$ python3 -m unittest pynapl.test.test_APL pynapl.test.test_Array
+```
+
+To run unit tests from APL:
+```apl
+      ]load pynapl/Py       
+      ]load pynapl/test/Test
+      Test.RunTests 2 ⍝ test with Python 2
+      Test.RunTests 3 ⍝ test with Python 3
+```
+
+There is also an interactive GUI test that uses [TkInter](https://wiki.python.org/moin/TkInter):
+```apl
+      ]load pynapl/Py
+      ]load pynapl/PyTest
+      PyTest.PyTest
+```
