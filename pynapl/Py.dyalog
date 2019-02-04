@@ -1181,7 +1181,7 @@
             ⍝ describing for each argument whether it should be converted
             ret.CallVec←{
                 ⍺←(≢,⍵)/1
-                (fname,'(',(1↓∊',',[1.5]'⍞⎕'[1+⍺]),')') py.Eval ,⍵   
+                ('(',fname,')(',(1↓∊',',[1.5]'⍞⎕'[1+⍺]),')') py.Eval ,⍵
             }
 
             ⍝ call the function with APL left and right arguments

@@ -142,6 +142,12 @@
 
         ∇
 
+        ⍝ test PyFn with lambdas
+        ∇ r←TEST_10⍙lambdas
+            ⍙EV←13
+            r←(py.PyFn'lambda x:x+10').Call 3
+        ∇
+
     :EndSection
 
     :Section Utility functions
