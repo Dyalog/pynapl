@@ -14,6 +14,10 @@ import os
 import signal
 import threading
 
+# add '' near the front of sys.path so users can import stuff from the
+# current directory, just like in a normal interactive python session
+sys.path.insert(1,'')
+
 # make sure to load the module this file is actually located in 
 mypath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.insert(1,mypath)
