@@ -1,4 +1,4 @@
-:Namespace IPC
+﻿:Namespace IPC
     ⍝ Send messages between the APL and Python process
     ⍝ w/o the overhead of Conga.
 
@@ -6,7 +6,6 @@
     ⍝ and 998 on interrupt.
 
     ⎕IO ⎕ML←1
-
 
     ∇Init;isOS
         
@@ -28,14 +27,14 @@
 
     ⍝ Use Conga
     :Namespace TCP
-        ∇ Init  
+        ∇ Init;z  
             ⍝ load Conga
             :If 0=⎕NC'#.DRC'
                 'DRC'#.⎕CY'conga.dws'
             :EndIf
 
-            :If 0≠⊃#.DRC.Init ''
-                'Conga is unavailable.' ⎕SIGNAL 999
+            :If 0≠⊃z←#.DRC.Init ''
+                ('Conga is unavailable: ',,⍕z) ⎕SIGNAL 999
             :EndIf
 
         ∇       
