@@ -4,6 +4,8 @@
 
 :Namespace WinPySlave
 
+    ⎕IO ⎕ML←1
+    
     ∇ Go
         :If 0=⎕NC'#.Py'
             ⎕←'ERROR: Py did not load.'

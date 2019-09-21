@@ -1,6 +1,8 @@
 ﻿:Namespace PyTest
 
+    ⎕IO ⎕ML←1
     num←0
+    
     ∇ r←ClickHello;update
         num+←1
         ⎕←'Hello! ',num

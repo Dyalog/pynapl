@@ -1,10 +1,11 @@
-﻿:Namespace IPC
+:Namespace IPC
     ⍝ Send messages between the APL and Python process
     ⍝ w/o the overhead of Conga.
 
     ⍝ The IPC functions signal 999 on error,
     ⍝ and 998 on interrupt.
 
+    ⎕IO ⎕ML←1
 
 
     ∇Init;isOS
