@@ -18,9 +18,19 @@ class PyEvaluator(object):
     @staticmethod
     def executeInContext(script, apl):
         """Run Python code"""
+        real_print = print
+        
+        def apl_print(*objects, sep=' ', end='\n', file=None, flush=False):
+            nonlocal real_print
+            if file is None:
+                apl.eval(f"⎕←{sep.join(objects)}{end}")
+            else:
+                real_print(*objects, sep=sep, end=end, file=file, flush=flush)
+        
         code = compile(script, '<APL>', 'exec')
-        globals()["APL"]=apl
-        exec(code,globals())
+        globals()["APL"] = apl
+        globals()["print"] = apl_print
+        exec(code, globals())
 
     def __init__(self, expr, args, conn):
         self.args=args
