@@ -1,0 +1,8 @@
+∇ r ← py CreateImage(img path)
+    ⍝ Create an image file with the data from `img`, and save it to `path`.
+    ⍝ `py` is a Py'n'APL instance to communicate with Python and,
+    ⍝ in particular, with the Pillow library.
+    py.Import 'PIL.Image'
+    py.Import 'numpy'
+    'PIL.Image.fromarray(numpy.array(⎕, dtype=numpy.uint8), mode="RGB").save(⎕)' py.Eval (2 0 1⍉img) path
+∇
