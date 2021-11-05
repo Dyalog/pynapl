@@ -1,0 +1,9 @@
+ Grid←{
+    ⍝ ⍵ is the amount of points per unit length
+    ⍝ (centre (w h)) ← ⍺
+
+     (centre(w h))←⍺
+     re←⍵÷⍨⍳⌈1+⍵×w
+     im←⌽0J1×⍵÷⍨⍳⌈1+⍵×h
+     (centre-(w÷2)+0J1×h÷2)+im∘.+re
+ }

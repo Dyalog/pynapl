@@ -1,0 +1,6 @@
+∇ data ← py FetchDemoGSpreadData credentials_path ;py
+    py.Import 'gspread'
+    py.Exec 'gc = gspread.service_account(filename=r"',credentials_path,'")'
+    py.Exec 'sh = gc.open("pynapl_demo")'
+    data ← ⍉⍎¨@1⍉↑ py.Eval 'sh.sheet1.get_all_values()'
+∇
