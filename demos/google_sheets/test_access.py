@@ -14,9 +14,22 @@ DEMO_SHEET = "pynapl_demo"
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--credentials", help="Path to service account credentials JSON.", default=KEY_FILE)
-    parser.add_argument("-s", "--sheet", help="Name of the sheet to try to access.", default=DEMO_SHEET)
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "-c",
+        "--credentials",
+        metavar="CREDENTIALS_PATH",
+        help="Path to service account credentials JSON.",
+        default=KEY_FILE,
+    )
+    parser.add_argument(
+        "-s",
+        "--sheet",
+        help="Name of the spreadsheet to try to access.",
+        default=DEMO_SHEET,
+    )
 
     args = parser.parse_args()
 

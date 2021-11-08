@@ -18,16 +18,31 @@ Start of by installing all the Python dependencies with
 python -m pip install -r requirements.txt
 ```
 
-To make sure that everything is set up so that you can use `gspread` to connect
-to the sheet, run the command
+Now, you want to be able to access the Google Sheets API programmatically.
+For that, you need to set up a service account.
+Luckily, the [`gspread` docs][gspread-docs-auth] walk you through the set up you need to do.
+
+To test if everything is working fine, you can create a copy of [this spreadsheet][demo-sheet].
+Then, you will want to share the copied sheet with the service account email you created
+by following the instructions in the `gspread` documentation.
+
+After that is done, you can use the `test_access.py` CLI to test the connection.
+
+Just run the command
 
 ```bash
-python test_access.py
+python test_access.py -c "path/to/credentials/file.json" -s "copied_spreadsheet_name"
 ```
 
-No news is good news, and it means you can connect to the sheet.
+or run
 
-If you _can_ connect to the sheet, then it's time to fetch its data from within APL:
+```bash
+python test_access.py --help
+```
+
+to get help.
+
+Once you _can_ connect to the sheet, it's time to fetch its data from within APL:
 
 ```APL
       ]load path/to/pynapl/Py
@@ -46,3 +61,4 @@ If you _can_ connect to the sheet, then it's time to fetch its data from within 
 
 
 [demo-sheet]: https://docs.google.com/spreadsheets/d/1pM5DbsyquFRHPqkhC0oWEK3KWsC3VH92Im8kns5Pkq4
+[gspread-docs-auth]: https://docs.gspread.org/en/latest/oauth2.html
