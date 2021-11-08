@@ -3,14 +3,26 @@ Test the `gspread` access to the demo sheet.
 """
 
 
+import argparse
 import pathlib
 
 import gspread
 
+
 KEY_FILE = pathlib.Path(__file__).parent / "pynapl-gspread-demo-key.json"
 DEMO_SHEET = "pynapl_demo"
 
-gc = gspread.service_account(filename=KEY_FILE)
-sh = gc.open(DEMO_SHEET)
 
-assert sh is not None
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--credentials", help="Path to service account credentials JSON.", default=KEY_FILE)
+    parser.add_argument("-s", "--sheet", help="Name of the sheet to try to access.", default=DEMO_SHEET)
+
+    args = parser.parse_args()
+
+    gc = gspread.service_account(filename=args.credentials)
+    sh = gc.open(args.sheet)
+
+    assert sh is not None, "Failed to connect to correct sheet!"
+
+    print("Successfully connected.")
