@@ -6,3 +6,4 @@ WinPort.dyalog
 build
 dist
 __pycache__
+*pynapl-gspread-demo-keys.json
