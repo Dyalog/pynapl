@@ -8,7 +8,11 @@ import sys
 import operator
 import json
 import codecs
-import collections
+
+try:
+    from collections.abc import Iterable  # Correct way in recent Python 3 versions.
+except ImportError:
+    from collections import Iterable
 
 
 try:
@@ -290,7 +294,7 @@ class APLArray(Sendable, Receivable):
             return APLArray.from_python(str(obj, "utf8"),enclose,apl)
 
         # if the object is iterable, but not one of the above, try making a list out of it
-        if isinstance(obj, collections.Iterable) \
+        if isinstance(obj, Iterable) \
         or hasattr(obj, '__iter__'):
             return APLArray.from_python(list(obj),False,apl)
 
