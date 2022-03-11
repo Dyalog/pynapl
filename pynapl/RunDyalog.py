@@ -134,15 +134,20 @@ def windows_find_dyalog():
     except: import _winreg as winreg 
     
     try:
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, pystr(br'Software\Dyalog'))
-        r=pystr(b''); i=0
-        while True:
-            r=winreg.EnumKey(key,i)
-            if pystr(b"Dyalog") in r and pystr(b"unicode") in r.lower(): break 
-            i+=1
-        key = winreg.OpenKey(key, r)
-        dir, _ = winreg.QueryValueEx(key, pystr(b"dyalog"))
+        # Windows. Let's find an installed version to use
+        hkcuReg = winreg.ConnectRegistry(None, winreg.HKEY_CURRENT_USER)
+        key = winreg.OpenKey(hkcuReg, r"SOFTWARE\Dyalog")
+        installCount = winreg.QueryInfoKey(key)[0]
+        for n in range(installCount):
+            currInstall = winreg.EnumKey(key, installCount - (n + 1))
+            if currInstall[:12] == "Dyalog APL/W":
+                break
+        lastKey = winreg.OpenKey(hkcuReg, r"SOFTWARE\\Dyalog\\" + currInstall)
+        dir = winreg.QueryValueEx(lastKey, "dyalog")[0]
         return to_bytes(dir) + br'\dyalog.exe'
+        # winreg.CloseKey(key)
+        # winreg.CloseKey(lastKey)
+
     except WindowsError:
         raise RuntimeError("Dyalog not found.")
     
