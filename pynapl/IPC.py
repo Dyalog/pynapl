@@ -8,12 +8,7 @@ import platform
 import os
 import select
 import socket
-import sys
 import tempfile
-
-# use Python 3 types on Python 2
-if sys.version_info.major == 2:
-    bytes, str = str, unicode
 
 # convert to bytes
 def to_bytes(x):

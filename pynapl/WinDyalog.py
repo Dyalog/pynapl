@@ -3,15 +3,11 @@
 from ctypes import *
 import os
 from subprocess import Popen, PIPE
-import sys
 import threading
 
 
 pidMainWindows = {}
 
-# use Python 3 types on Python 2
-if sys.version_info.major == 2:
-    bytes, str = str, unicode
 
 # convert to bytes
 def to_bytes(x):
@@ -43,8 +39,7 @@ except NameError:
 
         # On Python 2, the input should be a string of bytes; on Python 3
         # it wants Unicode. 'Popen' works only with bytes in any case.
-        if sys.version_info.major >= 3:
-            user32dll_cygpath = from_bytes(user32dll_cygpath)
+        user32dll_cygpath = from_bytes(user32dll_cygpath)
         user32 = cdll.LoadLibrary(user32dll_cygpath)
     except (KeyError, OSError):
         # not Windows at all

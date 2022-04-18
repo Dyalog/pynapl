@@ -2,12 +2,8 @@
 # This allows a representation of a Python object to be sent over to
 # APL
 
-import sys
 
 from .ConversionInterface import Sendable, Receivable
-
-if sys.version_info.major == 2:
-    bytes, str = str, unicode
 
 # store and free object instances
 class ObjectStore(object):

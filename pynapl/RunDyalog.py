@@ -4,12 +4,8 @@ import platform
 import os
 import re
 from subprocess import Popen, PIPE
-import sys
 import threading
 
-# Use python 3 types in python 2
-if sys.version_info.major == 2:
-    bytes, str = str, unicode
 
 SCRIPTFILE = os.path.realpath(__file__)
 
@@ -36,8 +32,7 @@ def pystr(x):
     or an Unicode string, depending on what the running version
     of Python would expect."""
     if type(x) is bytes:
-        if sys.version_info.major >= 3:
-            return str(x, "utf-8")
+        return str(x, "utf-8")
     return x
 
 
