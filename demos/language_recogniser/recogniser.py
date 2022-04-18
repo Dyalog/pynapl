@@ -61,7 +61,7 @@ def recognise_sentence(apl: Connection.APL, totals: List[int], sentence: str) ->
     """Performs automatic language recognition on the given sentence."""
 
     log_probabilities = [
-        sum(math.log(c/total) for c in get_counts(apl, sentence.lower(), lang))
+        sum(math.log(c / total) for c in get_counts(apl, sentence.lower(), lang))
         for lang, total in zip(LANGUAGES, totals)
     ]
     # Find the index where log_probabilities is maximal and return respective language.
@@ -72,10 +72,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--sentence", help="Sentence to recognise.")
     parser.add_argument(
-        "-i",
-        "--interactive",
-        help="Enter interactive mode.",
-        action="store_true"
+        "-i", "--interactive", help="Enter interactive mode.", action="store_true"
     )
     args = parser.parse_args()
 

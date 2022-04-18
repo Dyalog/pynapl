@@ -27,6 +27,7 @@ _APL = APL.APL()
 
 class Palette(enum.Enum):
     """Enum with the colours used."""
+
     BACKGROUND_COLOUR = (68, 71, 90)
     FOREGROUND_COLOUR = (248, 248, 242)
 
@@ -37,9 +38,7 @@ def set_status(positions: Coordinates, alive: bool):
 
 
 def paint(
-    screen: pygame.Surface,
-    positions: Coordinates,
-    alive: bool
+    screen: pygame.Surface, positions: Coordinates, alive: bool
 ) -> List[pygame.rect.Rect]:
     """Draw the given cells to be of the given status."""
     rect = pygame.Rect(0, 0, CELL_SIZE, CELL_SIZE)
@@ -110,9 +109,9 @@ if __name__ == "__main__":
                 if event.key == pygame.K_SPACE:
                     evolving = not evolving
                     wait_next_gen = FPS // GENS_PER_SEC
-                    pygame.display.set_caption("Game of Life" + (
-                        "" if evolving else " (paused)"
-                    ))
+                    pygame.display.set_caption(
+                        "Game of Life" + ("" if evolving else " (paused)")
+                    )
 
                 elif event.key == pygame.K_r:
                     _APL.eval("board ← ?2⍴⍨⍴board")

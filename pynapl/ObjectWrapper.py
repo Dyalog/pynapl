@@ -7,7 +7,7 @@ import sys
 from .ConversionInterface import Sendable, Receivable
 
 if sys.version_info.major == 2:
-    bytes, str=str, unicode
+    bytes, str = str, unicode
 
 # store and free object instances
 class ObjectStore(object):
@@ -27,17 +27,17 @@ class ObjectStore(object):
 
         if ref in self.objects:
             obj, refcount = self.objects[ref]
-            self.objects[ref] = (obj, refcount+1)
+            self.objects[ref] = (obj, refcount + 1)
         else:
             self.objects.update({ref: (obj, 1)})
-        
+
         return ref
 
     def retrieve(self, ref):
         """Return a reference to an object, if we have it."""
         ref = str(ref)
         if not ref in self.objects:
-            raise ValueError("No object with reference: %s"%ref)
+            raise ValueError("No object with reference: %s" % ref)
         obj, refcount = self.objects[ref]
         return obj
 
@@ -45,20 +45,19 @@ class ObjectStore(object):
         """Release an object, given a reference."""
         ref = str(ref)
         if not ref in self.objects:
-            raise ValueError("No object with reference: %s"%ref)
+            raise ValueError("No object with reference: %s" % ref)
 
         obj, refcount = self.objects[ref]
-        if refcount<=1:
+        if refcount <= 1:
             # There are no more references to this object on the APL side,
             # so remove it.
             del self.objects[ref]
         else:
-            self.objects[ref] = (obj, refcount-1)
+            self.objects[ref] = (obj, refcount - 1)
 
 
 # Wrap an object and store it in an object store
 class ObjectWrapper(Sendable):
-    
     def __init__(self, store, obj):
         self.__store = store
         self.__ref = store.store(obj)
@@ -67,17 +66,17 @@ class ObjectWrapper(Sendable):
         return self.__ref
 
     def items(self):
-        """Return a list of variable names and function names """
+        """Return a list of variable names and function names"""
         obj = self.__store.retrieve(self.__ref)
         classname = obj.__class__.__name__
-        va=[]
-        fn=[]
+        va = []
+        fn = []
 
         for attr in dir(obj):
 
             try:
                 item = getattr(obj, attr)
-                if hasattr(item,'__call__'):
+                if hasattr(item, "__call__"):
                     fn.append(attr)
                 else:
                     va.append(attr)
@@ -87,7 +86,7 @@ class ObjectWrapper(Sendable):
                 # an error if you actually tried to use it. Since this wrapper
                 # pokes everything, it would trap all of that, so we catch
                 # ImportError and ignore it. If something could not be imported,
-                # it is simply not included in the list of attributes. 
+                # it is simply not included in the list of attributes.
                 pass
             except (AttributeError, KeyError):
                 # Some objects claim to have attributes (via `dir`), but then raise
@@ -103,6 +102,7 @@ class ObjectWrapper(Sendable):
         cls, va, fn = self.items()
         return {"id": self.ref(), "cls": cls, "va": va, "fn": fn}
 
+
 # only holds a reference, but can be used to retrieve the actual object
 class ObjectRef(Receivable):
     def __init__(self, ref):
@@ -111,4 +111,3 @@ class ObjectRef(Receivable):
     # to match the Array function.
     def to_python(self, apl):
         return apl.store.retrieve(self.ref)
-
