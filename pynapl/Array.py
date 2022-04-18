@@ -7,11 +7,11 @@ try:
     import numpy as np
 
     NUMPY_SUPPORT = True
-except:
+except ImportError:
     NUMPY_SUPPORT = False
 
 from .Util import *
-from .ObjectWrapper import ObjectWrapper, ObjectStore, ObjectRef
+from .ObjectWrapper import ObjectWrapper, ObjectRef
 from .ConversionInterface import Sendable, Receivable
 
 # in Python 3, the distinction between "long" and "int" doesn't exist
