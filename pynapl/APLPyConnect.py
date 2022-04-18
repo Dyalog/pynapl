@@ -7,17 +7,23 @@
 #   0     1  2  3  4         ......
 #   TYPE  SIZE (big-endian)  MESSAGE (`size` bytes, expected to be UTF-8 encoded)
 
-from __future__ import absolute_import 
-from __future__ import division
-from __future__ import unicode_literals
-from __future__ import print_function
 
-import socket, os, time, types, signal, select, sys, json
-import tempfile, platform
-from . import RunDyalog, Interrupt, WinDyalog, IPC
+import json
+import os
+import platform
+import signal
+import sys
+import time
+import types
+
 from .Array import *
+import Interrupt
+import IPC
 from .PyEvaluator import PyEvaluator
 from .ObjectWrapper import *
+import RunDyalog
+import WinDyalog
+
 
 # in Python 2, set string types to be their Python 3 equivalents
 if sys.version_info.major == 2:

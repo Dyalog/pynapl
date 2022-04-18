@@ -1,13 +1,10 @@
 # Code to communicate with the Windows version of Dyalog
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals 
-
 from ctypes import *
+import os
 from subprocess import Popen, PIPE
-import threading, os, sys
+import sys
+import threading
 
 
 pidMainWindows = {}

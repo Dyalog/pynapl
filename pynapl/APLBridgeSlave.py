@@ -3,27 +3,13 @@
 # This program will connect to the APL side,
 # after which it will execute commands given to it.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import unicode_literals
-from __future__ import print_function
-
-import socket
-import sys
 import os
 import signal
+import sys
 import threading
 
-# add '' near the front of sys.path so users can import stuff from the
-# current directory, just like in a normal interactive python session
-sys.path.insert(1,'')
-
-# make sure to load the module this file is actually located in 
-mypath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-sys.path.insert(1,mypath)
-
-from pynapl import APLPyConnect as C
-from pynapl import IPC
+import IPC
+import APLPyConnect as C
 
 def runSlave(inp,outp):
     print("Opening input file...")

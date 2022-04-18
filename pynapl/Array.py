@@ -1,19 +1,7 @@
-# -*- coding: utf-8 -*-
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import unicode_literals
-
-import sys
-import operator
+from collections.abc import Iterable
 import json
-import codecs
-
-try:
-    from collections.abc import Iterable  # Correct way in recent Python 3 versions.
-except ImportError:
-    from collections import Iterable
-
+import operator
+import sys
 
 try:
     import numpy as np

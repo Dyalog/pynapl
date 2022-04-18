@@ -2,21 +2,12 @@
 
 """Dyalog APL <> Python interface"""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import unicode_literals
-from __future__ import print_function
+import threading
 
-from . import Array
-from . import APLPyConnect
-from . import IPC
+import APLPyConnect
+import Array
+import IPC
 
-import socket, threading, sys, types
-
-if sys.version_info.major >= 3:
-    import queue
-else:
-    import Queue as queue
 
 def APL(debug=False, dyalog=None, forceTCP=False):
     """Start an APL interpreter

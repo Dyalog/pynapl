@@ -1,13 +1,8 @@
 # Utility functions
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import unicode_literals
-
 from functools import reduce
-
-
 import operator
+
 
 def product(seq):
     """The product of a sequence of numbers"""

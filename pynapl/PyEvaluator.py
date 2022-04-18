@@ -1,12 +1,6 @@
 # PyEvaluator
 # -*- coding: utf-8 -*- 
 
-# NOTE: this file should be compatible with both Python 2 and 3 with the
-# minimal amount of future imports, since they will potentially mess with
-# Python 2 code that's passed in.
-
-from __future__ import absolute_import
-
 from .Array import *
 
 class PyEvaluator(object):

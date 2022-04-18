@@ -3,15 +3,14 @@
 # On Linux, this is implemented with mkfifo
 # On Windows, we use named pipes
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import unicode_literals
-from __future__ import print_function
-
-import sys, os, tempfile, select, ctypes, socket, platform
-
+from ctypes import *
+import platform
+import os
+import select
+import socket
 from subprocess import Popen, PIPE
-from ctypes import * 
+import sys
+import tempfile
 
 # use Python 3 types on Python 2
 if sys.version_info.major == 2:

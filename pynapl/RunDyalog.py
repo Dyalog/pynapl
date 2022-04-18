@@ -1,13 +1,11 @@
 # Run a Dyalog instance in the background and start the Python client
-# -*- coding: utf-8 -*-
 
-from __future__ import absolute_import 
-from __future__ import division
-from __future__ import unicode_literals
-from __future__ import print_function
-
-import sys, os, threading, platform, re
+import platform
+import os
+import re
 from subprocess import Popen, PIPE
+import sys
+import threading
 
 # Use python 3 types in python 2
 if sys.version_info.major == 2:
