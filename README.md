@@ -5,8 +5,12 @@ code to be accessed from APL, and vice versa.
 
 #### Requirements:
 
- - Dyalog APL version 16.0 Unicode
- - Python 2.7.9 or higher, or Python 3.4 or higher.
+**Attention**: this branch contains a version of the interface that
+had been tested with Dyalog APL 16.0 Unicode,
+and that supported Python 2.7.9+, or Python 3.4, 3.5, or 3.6.
+This version of the interface has not been maintained/developed
+for these Python versions.
+The up-to-date Py'n'APL interface requires newer Python and Dyalog APL versions.
 
 ## User manual
 
