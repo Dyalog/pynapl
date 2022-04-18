@@ -14,15 +14,6 @@ from .Util import *
 from .ObjectWrapper import ObjectWrapper, ObjectRef
 from .ConversionInterface import Sendable, Receivable
 
-# in Python 3, the distinction between "long" and "int" doesn't exist
-# anymore
-if sys.version_info.major >= 3:
-    long = int
-
-# define (str, bytes) to be their Python 3 types
-if sys.version_info.major == 2:
-    bytes = str
-    str = unicode
 
 # assuming ⎕IO=0 for now
 class APLNamespace(Sendable, Receivable):
@@ -271,7 +262,7 @@ class APLArray(Sendable, Receivable):
             )
 
         # numbers can be represented as numbers, enclosed if at the upper level so we always send an 'array'
-        elif type(obj) in (int, long, float, complex):
+        elif type(obj) in (int, float, complex):
             if enclose:
                 return APLArray(
                     rho=[], data=[obj], type_hint=APLArray.TYPE_HINT_NUM, apl=apl
@@ -429,7 +420,7 @@ class APLArray(Sendable, Receivable):
         )
 
     def check_valid_idx(self, idx):
-        if type(idx) in (int, long):  # if ⍴=1, allow for index to be given as scalar
+        if type(idx) in (int,):  # if ⍴=1, allow for index to be given as scalar
             idx = [idx]
 
         if not len(idx) == len(self.rho):

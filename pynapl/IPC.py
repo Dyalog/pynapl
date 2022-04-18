@@ -8,7 +8,6 @@ import platform
 import os
 import select
 import socket
-from subprocess import Popen, PIPE
 import sys
 import tempfile
 
