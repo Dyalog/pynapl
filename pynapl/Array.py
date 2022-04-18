@@ -16,6 +16,27 @@ from .ObjectWrapper import ObjectWrapper, ObjectRef
 from .ConversionInterface import Sendable, Receivable
 
 
+def scan_reverse(f, arr):
+    """Scan over a list in reverse, using a function"""
+    r = list(arr)
+    for i in reversed(range(len(r))[1:]):
+        r[i - 1] = f(r[i - 1], r[i])
+    return r
+
+
+def extend(arr, length):
+    """Extend a list APL-style"""
+    if len(arr) >= length:
+        return arr[:length]
+    else:
+        r = arr[:]
+        while length - len(r) >= len(arr):
+            r.extend(arr)
+        else:
+            r.extend(arr[: length - len(r)])
+        return r
+
+
 # assuming ⎕IO=0 for now
 class APLNamespace(Sendable, Receivable):
     def __init__(self, dct=None, apl=None):
