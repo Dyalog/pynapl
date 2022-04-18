@@ -2,7 +2,7 @@
 name = "pynapl"
 version = "0.1.0"
 description = "Dyalog APL and Python interface."
-authors = ["Marinus, Rodrigo Girão Serrão"]
+authors = ["Marinus", "Rodrigo Girão Serrão <rodrigo@dyalog.com>"]
 license = "MIT License"
 
 [tool.poetry.dependencies]
