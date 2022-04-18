@@ -1,14 +1,5 @@
 # Utility functions
 
-from functools import reduce
-import operator
-
-
-def product(seq):
-    """The product of a sequence of numbers"""
-    return reduce(operator.__mul__, seq, 1)
-
-
 def scan_reverse(f, arr):
     """Scan over a list in reverse, using a function"""
     r = list(arr)

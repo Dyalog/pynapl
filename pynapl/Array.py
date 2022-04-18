@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 import json
+from math import prod
 import operator
 import sys
 
@@ -360,7 +361,7 @@ class APLArray(Sendable, Receivable):
         else:
             newrho = self.rho[:-1]
             blocksz = self.rho[-1]
-            nblocks = product(newrho)
+            nblocks = prod(newrho)
             newdata = []
 
             for blockn in range(nblocks):
@@ -405,7 +406,7 @@ class APLArray(Sendable, Receivable):
     def __init__(self, rho, data, type_hint=None, apl=None):
         self.rho = rho
         self.apl = apl
-        self.data = extend(list(data), product(rho))
+        self.data = extend(list(data), prod(rho))
         # deduce type from data
         if not type_hint is None:
             # hint is given
