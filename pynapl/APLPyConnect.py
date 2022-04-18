@@ -25,18 +25,8 @@ import RunDyalog
 import WinDyalog
 
 
-# in Python 2, set string types to be their Python 3 equivalents
-if sys.version_info.major == 2:
-    bytes, str = str, unicode
-
-# in Python 3, allow use of long
-if sys.version_info.major >= 3:
-    long = int
-
-# in Python 2, sockets give bytes as ASCII characters.
-# in Python 3, sockets give either Unicode or bytes as ints.
 def maybe_ord(item):
-    if type(item) in (int, long):
+    if isinstance(item, int):
         return item
     else:
         return ord(item)
