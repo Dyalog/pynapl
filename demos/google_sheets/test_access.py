@@ -8,7 +8,6 @@ import pathlib
 
 import gspread
 
-
 KEY_FILE = pathlib.Path(__file__).parent / "pynapl-gspread-demo-key.json"
 DEMO_SHEET = "pynapl_demo"
 

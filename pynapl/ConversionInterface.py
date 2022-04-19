@@ -1,6 +1,5 @@
-# -*- coding: utf-8 -*-
-
 import json
+
 
 # Any object that can do from_python will inherit from this class
 class Sendable(object):

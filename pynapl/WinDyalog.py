@@ -1,10 +1,9 @@
 # Code to communicate with the Windows version of Dyalog
 
-from ctypes import *
 import os
-from subprocess import Popen, PIPE
 import threading
-
+from ctypes import byref, c_uint, cdll, create_unicode_buffer, windll
+from subprocess import PIPE, Popen
 
 pidMainWindows = {}
 

@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import unicode_literals
+from __future__ import absolute_import, division, unicode_literals
+
+import random
+import sys
+import unittest
 
 from .. import APL
-
-import unittest
-import sys
-import random
 
 
 class TestAPL(unittest.TestCase):

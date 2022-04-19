@@ -3,7 +3,8 @@
 # APL
 
 
-from .ConversionInterface import Sendable, Receivable
+from .ConversionInterface import Receivable, Sendable
+
 
 # store and free object instances
 class ObjectStore(object):

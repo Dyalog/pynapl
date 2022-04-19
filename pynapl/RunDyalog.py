@@ -1,11 +1,10 @@
 # Run a Dyalog instance in the background and start the Python client
 
-import platform
 import os
+import platform
 import re
-from subprocess import Popen, PIPE
 import threading
-
+from subprocess import PIPE, Popen
 
 SCRIPTFILE = os.path.realpath(__file__)
 

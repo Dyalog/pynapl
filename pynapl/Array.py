@@ -1,8 +1,8 @@
-from collections.abc import Iterable
 import json
-from math import prod
 import operator
 import sys
+from collections.abc import Iterable
+from math import prod
 
 try:
     import numpy as np
@@ -11,9 +11,8 @@ try:
 except ImportError:
     NUMPY_SUPPORT = False
 
-from .Util import *
-from .ObjectWrapper import ObjectWrapper, ObjectRef
-from .ConversionInterface import Sendable, Receivable
+from .ConversionInterface import Receivable, Sendable
+from .ObjectWrapper import ObjectRef, ObjectWrapper
 
 
 def scan_reverse(f, arr):

@@ -1,5 +1,4 @@
 # APLPyConnect
-# -*- coding: utf-8 -*-
 
 # This module handles the passing of messages between the APL side and the Python side
 
@@ -16,13 +15,14 @@ import sys
 import time
 import types
 
-from .Array import *
 import Interrupt
 import IPC
-from .PyEvaluator import PyEvaluator
-from .ObjectWrapper import *
 import RunDyalog
 import WinDyalog
+
+from .Array import APLArray
+from .ObjectWrapper import ObjectStore, ObjectWrapper
+from .PyEvaluator import PyEvaluator
 
 
 def maybe_ord(item):

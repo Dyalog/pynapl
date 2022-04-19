@@ -3,12 +3,12 @@
 # On Linux, this is implemented with mkfifo
 # On Windows, we use named pipes
 
-from ctypes import *
-import platform
 import os
+import platform
 import select
 import socket
 import tempfile
+
 
 # convert to bytes
 def to_bytes(x):

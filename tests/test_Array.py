@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import unicode_literals
+from __future__ import absolute_import, division, unicode_literals
 
-from ..Array import *
-from ..Util import *
-from .. import APL
-
-import unittest
 import random
 import sys
+import unittest
+
+from .. import APL
+from ..Array import *
+from ..Util import *
 
 if sys.version_info.major >= 3:
     # have a known generator in both versions w/o affecting anything else
