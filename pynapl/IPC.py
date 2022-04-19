@@ -10,21 +10,6 @@ import socket
 import tempfile
 
 
-# convert to bytes
-def to_bytes(x):
-    if type(x) is str:
-        return x.encode("utf-8")
-    else:
-        return x
-
-
-def from_bytes(x):
-    if type(x) is bytes:
-        return str(x, "utf-8")
-    else:
-        return x
-
-
 class FIFO(object):
     def avail(self, timeout):
         raise NotImplemented()
