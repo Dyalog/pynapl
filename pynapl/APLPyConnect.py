@@ -81,7 +81,7 @@ class MalformedMessage(Exception):
     pass
 
 
-class Message(object):
+class Message:
     """A message to be sent to the other side"""
 
     OK = 0  # sent as response to message that succeeded but returns nothing
@@ -199,10 +199,10 @@ class Message(object):
                 signal.signal(signal.SIGINT, s)
 
 
-class Connection(object):
+class Connection:
     """A connection"""
 
-    class APL(object):
+    class APL:
         """Represents the APL interpreter."""
 
         pid = None

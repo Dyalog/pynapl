@@ -42,7 +42,7 @@ except NameError:
         user32 = cdll.LoadLibrary(user32dll_cygpath)
     except (KeyError, OSError):
         # not Windows at all
-        class X(object):
+        class X:
             def __getattr__(self, attr):
                 raise RuntimeError(
                     "Cannot call Windows functions from Unix (%s)." % attr

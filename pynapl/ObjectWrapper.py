@@ -7,7 +7,7 @@ from .ConversionInterface import Receivable, Sendable
 
 
 # store and free object instances
-class ObjectStore(object):
+class ObjectStore:
     """Stores instances of objects that APL knows about, so they can
     be retrieved by ID and aren't garbage-collected."""
 

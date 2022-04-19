@@ -4,7 +4,7 @@
 from .Array import APLArray
 
 
-class PyEvaluator(object):
+class PyEvaluator:
     """Evaluate a Python expression"""
 
     # If it's stupid and it works, it's still stupid, but at least it works

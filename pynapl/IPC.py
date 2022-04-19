@@ -10,7 +10,7 @@ import socket
 import tempfile
 
 
-class FIFO(object):
+class FIFO:
     def avail(self, timeout):
         raise NotImplemented()
 

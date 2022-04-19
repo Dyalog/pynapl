@@ -2,7 +2,7 @@ import json
 
 
 # Any object that can do from_python will inherit from this class
-class Sendable(object):
+class Sendable:
     def toJSONDict(self):
         raise NotImplemented()
 
@@ -11,7 +11,7 @@ class Sendable(object):
 
 
 # Any object that can do to_python will inherit from this class
-class Receivable(object):
+class Receivable:
     def to_python(self, apl=None):
         raise NotImplemented()
 
