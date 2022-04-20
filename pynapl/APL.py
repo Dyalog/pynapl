@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """Dyalog APL <> Python interface"""
 
 import threading

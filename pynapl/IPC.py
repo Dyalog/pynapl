@@ -1,5 +1,3 @@
-# IPC
-
 # On Linux, this is implemented with mkfifo
 # On Windows, we use named pipes
 

@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # This program will connect to the APL side,
 # after which it will execute commands given to it.
 

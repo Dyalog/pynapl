@@ -1,6 +1,3 @@
-# PyEvaluator
-# -*- coding: utf-8 -*-
-
 from .Array import APLArray
 
 

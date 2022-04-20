@@ -1,5 +1,3 @@
-# APLPyConnect
-
 # This module handles the passing of messages between the APL side and the Python side
 
 # The format of a message is:
