@@ -20,7 +20,7 @@ script = """
 
 
 def to_bytes(x):
-    if not type(x) is bytes:
+    if not isinstance(x, bytes):
         return x.encode("utf-8")
     else:
         return x
@@ -30,7 +30,7 @@ def pystr(x):
     """Given a string of bytes, returns either an ASCII string
     or an Unicode string, depending on what the running version
     of Python would expect."""
-    if type(x) is bytes:
+    if isinstance(x, bytes):
         return str(x, "utf-8")
     return x
 

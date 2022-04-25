@@ -10,14 +10,14 @@ pidMainWindows = {}
 
 # convert to bytes
 def to_bytes(x):
-    if type(x) is str:
+    if isinstance(x, str):
         return x.encode("utf-8")
     else:
         return x
 
 
 def from_bytes(x):
-    if type(x) is bytes:
+    if isinstance(x, bytes):
         return str(x, "utf-8")
     else:
         return x

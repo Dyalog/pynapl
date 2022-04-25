@@ -59,7 +59,7 @@ class APLError(Exception):
         self.dmx = None
         # if a JSON object is given, use that
         if not jsobj is None:
-            if type(jsobj) is bytes:
+            if isinstance(jsobj, bytes):
                 jsobj = str(jsobj, "utf-8")
             errobj = json.loads(jsobj)
             message = errobj["Message"]
@@ -69,7 +69,7 @@ class APLError(Exception):
                     message += ": " + self.dmx["Message"]
 
         # if on Python 3 and these are bytes, convert to unicode
-        if sys.version_info.major >= 3 and type(message) is bytes:
+        if isinstance(message, bytes):
             Exception.__init__(self, str(message, "utf-8"))
         else:
             Exception.__init__(self, message)
@@ -101,7 +101,7 @@ class Message:
         """Initialize a message"""
         self.type = mtype
         self.data = mdata
-        if type(self.data) is str:
+        if isinstance(self.data, str):
             self.data = self.data.encode("utf8")
         if len(self.data) > Message.MAX_LEN:
             raise ValueError("message body exceeds maximum length")
@@ -270,7 +270,7 @@ class Connection:
             than be converted to a 'suitable' Python representation.
             """
 
-            if not type(aplfn) is str:
+            if not isinstance(aplfn, str):
                 aplfn = str(aplfn, "utf-8")
 
             def __fn(*args):
@@ -298,16 +298,13 @@ class Connection:
             and the function is run in APL directly.
             """
 
-            if not type(aplop) is str:
+            if not isinstance(aplop, str):
                 aplop = str(aplop, "utf-8")
 
             def storeArgInWs(arg, nm):
                 wsname = "___op%d_%s" % (self.ops, nm)
 
-                if (
-                    type(arg) is types.FunctionType
-                    or type(arg) is types.BuiltinFunctionType
-                ):
+                if isinstance(arg, (types.FunctionType, types.BuiltinFunctionType)):
                     # it is a function
                     if hasattr(arg, "__dict__") and "aplfn" in arg.__dict__:
                         # it is an APL function
@@ -396,10 +393,10 @@ class Connection:
             Input may be a string or a list."""
 
             # implemented using eval
-            if not type(code) is str:
+            if not isinstance(code, str):
                 code = str(code, "utf-8")
 
-            if not type(code) is list:
+            if not isinstance(code, list):
                 code = code.split("\n")  # luckily APL has no multiline strings
 
             return self.eval("2⎕FIX ∆", *code)
@@ -409,7 +406,7 @@ class Connection:
             as an array ∆. If `raw' is set, the result is not converted to a
             Python representation."""
 
-            if not type(aplexpr) is str:
+            if not isinstance(aplexpr, str):
                 # this should be an UTF-8 string
                 aplexpr = str(aplexpr, "utf8")
 
@@ -592,7 +589,7 @@ class Connection:
                 sig = allowInterrupts()
 
                 script = message.data
-                if type(script) is bytes:
+                if isinstance(script, bytes):
                     script = str(script, "utf-8")
 
                 PyEvaluator.executeInContext(script, self.apl)
@@ -621,7 +618,7 @@ class Connection:
                     raise MalformedMessage("First argument must contain code string.")
 
                 code = val[[0]].to_python(self.apl)
-                if not type(code) in (str, bytes):
+                if not isinstance(code, (str, bytes)):
                     raise MalformedMessage(
                         "Code element must be a string, but got: %s" % repr(code)
                     )

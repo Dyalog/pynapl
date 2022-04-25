@@ -172,7 +172,7 @@ class APLArray(Sendable, Receivable):
     def __json_object_hook(jsobj):
         # if this is an APL array, return it as such
 
-        if type(jsobj) is dict:
+        if isinstance(jsobj, dict):
             if "r" in jsobj and "d" in jsobj:
                 # this is an APL array
                 type_hint = APLArray.TYPE_HINT_NUM
@@ -270,12 +270,12 @@ class APLArray(Sendable, Receivable):
         if isinstance(obj, Sendable):
             return obj  # it already is of the right type
 
-        if type(obj) is dict:
+        if isinstance(obj, dict):
             # convert all items in the dictionary to APL representation
             return APLNamespace.from_python(obj, apl=apl)
 
         # lists, tuples and strings can be represented as vectors
-        if type(obj) in (list, tuple):
+        if isinstance(obj, (list, tuple)):
             return APLArray(
                 rho=[len(obj)],
                 data=[APLArray.from_python(x, False, apl) for x in obj],
@@ -283,7 +283,7 @@ class APLArray(Sendable, Receivable):
             )
 
         # numbers can be represented as numbers, enclosed if at the upper level so we always send an 'array'
-        elif type(obj) in (int, float, complex):
+        elif isinstance(obj, (int, float, complex)):
             if enclose:
                 return APLArray(
                     rho=[], data=[obj], type_hint=APLArray.TYPE_HINT_NUM, apl=apl
@@ -292,11 +292,11 @@ class APLArray(Sendable, Receivable):
                 return obj
 
         # boolean scalars should convert to ints for APL's sake
-        elif type(obj) is bool:
+        elif isinstance(obj, bool):
             return APLArray.from_python(int(obj), enclose, apl)
 
         # a one-element string is a character, a multi-element string is a vector
-        elif type(obj) is str:
+        elif isinstance(obj, str):
             if len(obj) == 1:
                 if enclose:
                     return APLArray(
@@ -309,7 +309,7 @@ class APLArray(Sendable, Receivable):
                 aplstr.type_hint = APLArray.TYPE_HINT_CHAR
                 return aplstr
 
-        elif type(obj) is bytes:
+        elif isinstance(obj, bytes):
             # a non-unicode string will be encoded as UTF-8
             return APLArray.from_python(str(obj, "utf8"), enclose, apl)
 
@@ -414,7 +414,7 @@ class APLArray(Sendable, Receivable):
             # we have some data to use
             if isinstance(self.data[0], APLArray):
                 self.type_hint = self.data[0].genTypeHint()
-            elif type(self.data[0]) in (str, bytes):
+            elif isinstance(self.data[0], (str, bytes)):
                 self.type_hint = APLArray.TYPE_HINT_CHAR
             else:
                 self.type_hint = APLArray.TYPE_HINT_NUM
@@ -441,7 +441,7 @@ class APLArray(Sendable, Receivable):
         )
 
     def check_valid_idx(self, idx):
-        if type(idx) in (int,):  # if ⍴=1, allow for index to be given as scalar
+        if isinstance(idx, int):  # if ⍴=1, allow for index to be given as scalar
             idx = [idx]
 
         if not len(idx) == len(self.rho):
@@ -468,6 +468,6 @@ class APLArray(Sendable, Receivable):
 
     @staticmethod
     def fromJSONString(string):
-        if type(string) is bytes:
+        if isinstance(string, bytes):
             string = str(string, "utf8")
         return APLArray._json_decoder.decode(string)
