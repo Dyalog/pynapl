@@ -28,17 +28,15 @@ def scan_reverse(f: Callable[[T, T], T], arr: Reversible[T]) -> Iterable[T]:
     return reversed(list(accumulate(reversed(arr), lambda x, y: f(y, x))))
 
 
-def extend(arr, length):
-    """Extend a list APL-style"""
-    if len(arr) >= length:
-        return arr[:length]
-    else:
-        r = arr[:]
+def extend(arr: list[T], length: int) -> list[T]:
+    """Extend a list APL-style, in-place"""
+
+    r = arr[:]
+    if len(r) < length:
         while length - len(r) >= len(arr):
             r.extend(arr)
-        else:
-            r.extend(arr[: length - len(r)])
-        return r
+        r.extend(arr[: length - len(r)])
+    return r[:length]
 
 
 # assuming ⎕IO=0 for now
