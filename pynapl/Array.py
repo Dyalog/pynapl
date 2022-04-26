@@ -1,7 +1,12 @@
+from __future__ import annotations
+
+
 import json
 import operator
 import sys
 from collections.abc import Iterable
+from itertools import accumulate
+from typing import Callable, Reversible, TypeVar
 from math import prod
 
 try:
@@ -15,12 +20,12 @@ from .ConversionInterface import Receivable, Sendable
 from .ObjectWrapper import ObjectRef, ObjectWrapper
 
 
-def scan_reverse(f, arr):
+T = TypeVar("T")
+
+
+def scan_reverse(f: Callable[[T, T], T], arr: Reversible[T]) -> Iterable[T]:
     """Scan over a list in reverse, using a function"""
-    r = list(arr)
-    for i in reversed(range(len(r))[1:]):
-        r[i - 1] = f(r[i - 1], r[i])
-    return r
+    return reversed(list(accumulate(reversed(arr), lambda x, y: f(y, x))))
 
 
 def extend(arr, length):
