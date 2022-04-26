@@ -3,7 +3,7 @@
 # APL
 
 
-from .ConversionInterface import Receivable, Sendable
+from .Array import Receivable, Sendable
 
 
 # store and free object instances

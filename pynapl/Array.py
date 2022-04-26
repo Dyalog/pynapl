@@ -16,11 +16,68 @@ try:
 except ImportError:
     NUMPY_SUPPORT = False
 
-from .ConversionInterface import Receivable, Sendable
 from .ObjectWrapper import ObjectRef, ObjectWrapper
 
 
 T = TypeVar("T")
+
+
+# Any object that can do from_python will inherit from this class
+class Sendable:
+    def toJSONDict(self):
+        raise NotImplemented()
+
+    def toJSONString(self):
+        return json.dumps(self, cls=ArrayEncoder, ensure_ascii=False)
+
+
+# Any object that can do to_python will inherit from this class
+class Receivable:
+    def to_python(self, apl=None):
+        raise NotImplemented()
+
+
+class ArrayEncoder(json.JSONEncoder):
+    """JSON encoder for instances of APLArray."""
+
+    def default(self, obj):
+        if isinstance(obj, Sendable):
+            return obj.toJSONDict()
+        elif isinstance(obj, complex):  # special-cased
+            return {"real": obj.real, "imag": obj.imag}
+        else:
+            return json.JSONEncoder.default(self, obj)
+
+
+def _json_object_hook(jsobj):
+    # if this is an APL array, return it as such
+
+    if isinstance(jsobj, dict):
+        if "r" in jsobj and "d" in jsobj:
+            # this is an APL array
+            type_hint = APLArray.TYPE_HINT_NUM
+            if "t" in jsobj:
+                type_hint = jsobj["t"]
+            return APLArray(jsobj["r"], list(jsobj["d"]), type_hint=type_hint)
+        elif "ns" in jsobj:
+            # this is an APL namespace, which can be represented as a dict in Python
+            return APLNamespace(jsobj["ns"])
+        elif "id" in jsobj:
+            # this is a reference to an APL object
+            return APLObjectFactory(jsobj)
+        elif "rid" in jsobj:
+            # this is a reference to a Python object sent over APL
+            return ObjectRef(jsobj["rid"])
+        elif "imag" in jsobj:
+            # this is a complex number
+            return complex(jsobj["real"], jsobj["imag"])
+        else:
+            return jsobj
+    else:
+        return jsobj
+
+
+ArrayDecoder = json.JSONDecoder(object_hook=_json_object_hook)
 
 
 def scan_reverse(f: Callable[[T, T], T], arr: Reversible[T]) -> Iterable[T]:
@@ -79,7 +136,7 @@ class APLNamespace(Sendable, Receivable):
 
     @staticmethod
     def fromJSONString(string):
-        return APLArray._json_decoder.decode(string)
+        return ArrayDecoder.decode(string)
 
 
 class APLObjectFactory(Receivable):
@@ -171,36 +228,6 @@ class APLArray(Sendable, Receivable):
     rho = None
     type_hint = None
 
-    # json decoder object hook
-    def __json_object_hook(jsobj):
-        # if this is an APL array, return it as such
-
-        if isinstance(jsobj, dict):
-            if "r" in jsobj and "d" in jsobj:
-                # this is an APL array
-                type_hint = APLArray.TYPE_HINT_NUM
-                if "t" in jsobj:
-                    type_hint = jsobj["t"]
-                return APLArray(jsobj["r"], list(jsobj["d"]), type_hint=type_hint)
-            elif "ns" in jsobj:
-                # this is an APL namespace, which can be represented as a dict in Python
-                return APLNamespace(jsobj["ns"])
-            elif "id" in jsobj:
-                # this is a reference to an APL object
-                return APLObjectFactory(jsobj)
-            elif "rid" in jsobj:
-                # this is a reference to a Python object sent over APL
-                return ObjectRef(jsobj["rid"])
-            elif "imag" in jsobj:
-                # this is a complex number
-                return complex(jsobj["real"], jsobj["imag"])
-            else:
-                return jsobj
-        else:
-            return jsobj
-
-    # define a reusable json decoder
-    _json_decoder = json.JSONDecoder(object_hook=__json_object_hook)
 
     # convert array to suitable-ish python representation
     def to_python(self, apl=None):
@@ -473,4 +500,4 @@ class APLArray(Sendable, Receivable):
     def fromJSONString(string):
         if isinstance(string, bytes):
             string = str(string, "utf8")
-        return APLArray._json_decoder.decode(string)
+        return ArrayDecoder.decode(string)
