@@ -18,8 +18,7 @@ from . import IPC
 from . import RunDyalog
 from . import WinDyalog
 
-from .Array import APLArray
-from .ObjectWrapper import ObjectStore, ObjectWrapper
+from .Array import APLArray, ObjectStore, ObjectWrapper
 from .PyEvaluator import PyEvaluator
 
 
