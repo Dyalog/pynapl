@@ -6,7 +6,7 @@ import operator
 import sys
 from collections.abc import Iterable
 from itertools import accumulate
-from typing import Callable, Reversible, TypeVar
+from typing import Any, Callable, Reversible, TypeVar
 from math import prod
 
 try:
@@ -22,8 +22,8 @@ from .ObjectWrapper import ObjectRef, ObjectWrapper
 T = TypeVar("T")
 
 
-# Any object that can do from_python will inherit from this class
 class Sendable:
+    """Class to be inherited by objects that we want to be able to send to APL."""
     def toJSONDict(self):
         raise NotImplemented()
 
@@ -31,8 +31,8 @@ class Sendable:
         return json.dumps(self, cls=ArrayEncoder, ensure_ascii=False)
 
 
-# Any object that can do to_python will inherit from this class
 class Receivable:
+    """Class to be inherited by objects that we might receive from APL."""
     def to_python(self, apl=None):
         raise NotImplemented()
 
@@ -81,12 +81,12 @@ ArrayDecoder = json.JSONDecoder(object_hook=_json_object_hook)
 
 
 def scan_reverse(f: Callable[[T, T], T], arr: Reversible[T]) -> Iterable[T]:
-    """Scan over a list in reverse, using a function"""
+    """Scan over a list in reverse, using a function."""
     return reversed(list(accumulate(reversed(arr), lambda x, y: f(y, x))))
 
 
 def extend(arr: list[T], length: int) -> list[T]:
-    """Extend a list APL-style, in-place"""
+    """Extend a list APL-style."""
 
     r = arr[:]
     if len(r) < length:
@@ -98,19 +98,15 @@ def extend(arr: list[T], length: int) -> list[T]:
 
 # assuming ⎕IO=0 for now
 class APLNamespace(Sendable, Receivable):
-    def __init__(self, dct=None, apl=None):
-        if dct is None:
-            self.dct = {}
-        else:
-            self.dct = dct
-
+    def __init__(self, dct: dict[str, APLArray] | None = None, apl=None):
+        self.dct = dct if dct is not None else {}
         self.apl = apl
 
-    def __getitem__(self, x):
-        return self.dct[x]
+    def __getitem__(self, key: str) -> APLArray:
+        return self.dct[key]
 
-    def __setitem__(self, x, val):
-        self.dct[x] = APLArray.from_python(val, enclose=False, apl=self.apl)
+    def __setitem__(self, key: str, val: Any):
+        self.dct[key] = APLArray.from_python(val, enclose=False, apl=self.apl)
 
     def toJSONDict(self):
         return {"ns": self.dct}
