@@ -1,12 +1,6 @@
-# -*- coding: utf-8 -*-
-
-from __future__ import absolute_import, division, unicode_literals
-
-import random
-import sys
 import unittest
 
-from .. import APL
+from pynapl import APL
 
 
 class TestAPL(unittest.TestCase):

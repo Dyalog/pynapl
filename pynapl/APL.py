@@ -2,9 +2,9 @@
 
 import threading
 
-import APLPyConnect
-import Array
-import IPC
+from . import APLPyConnect
+from . import Array
+from . import IPC
 
 
 def APL(debug=False, dyalog=None, forceTCP=False):
