@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import operator
 import sys
+from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from itertools import accumulate
 from typing import Any, Callable, Reversible, TypeVar
@@ -22,19 +23,28 @@ from .ObjectWrapper import ObjectRef, ObjectWrapper
 T = TypeVar("T")
 
 
-class Sendable:
-    """Class to be inherited by objects that we want to be able to send to APL."""
-    def toJSONDict(self):
-        raise NotImplemented()
+class Sendable(ABC):
+    """Class to be inherited by objects that we want to be able to send to APL.
 
-    def toJSONString(self):
-        return json.dumps(self, cls=ArrayEncoder, ensure_ascii=False)
+    Sendables know how to convert to JSON-like Python dictionaries with string keys
+    and with values that the module json knows how to convert."""
+
+    @abstractmethod
+    def to_json(self) -> dict[str, Any]:
+        """Converts a Sendable object to a JSON-like dictionary."""
+        raise NotImplementedError()
+
+    def dumps(self) -> str:
+        """Converts a Sendable object to a JSON string."""
+        return json.dumps(self.to_json(), cls=ArrayEncoder, ensure_ascii=False)
 
 
-class Receivable:
+class Receivable(ABC):
     """Class to be inherited by objects that we might receive from APL."""
+
+    @abstractmethod
     def to_python(self, apl=None):
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
 class ArrayEncoder(json.JSONEncoder):
@@ -42,7 +52,7 @@ class ArrayEncoder(json.JSONEncoder):
 
     def default(self, obj):
         if isinstance(obj, Sendable):
-            return obj.toJSONDict()
+            return obj.to_json()
         elif isinstance(obj, complex):  # special-cased
             return {"real": obj.real, "imag": obj.imag}
         else:
@@ -108,7 +118,7 @@ class APLNamespace(Sendable, Receivable):
     def __setitem__(self, key: str, val: Any):
         self.dct[key] = APLArray.from_python(val, enclose=False, apl=self.apl)
 
-    def toJSONDict(self):
+    def to_json(self):
         return {"ns": self.dct}
 
     # convert an APL namespace to a Python dictionary
@@ -199,7 +209,7 @@ class APLObject(Sendable):
         except:
             pass
 
-    def toJSONDict(self):
+    def to_json(self):
         return {"rid": self.__s["id"]}
 
     def to_python(self, apl=None):
@@ -223,7 +233,6 @@ class APLArray(Sendable, Receivable):
     data = None
     rho = None
     type_hint = None
-
 
     # convert array to suitable-ish python representation
     def to_python(self, apl=None):
@@ -489,7 +498,7 @@ class APLArray(Sendable, Receivable):
             val, enclose=False, apl=self.apl
         )
 
-    def toJSONDict(self):
+    def to_json(self):
         return {"r": self.rho, "d": self.data, "t": self.genTypeHint()}
 
     @staticmethod

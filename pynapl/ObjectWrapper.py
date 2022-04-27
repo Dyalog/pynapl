@@ -95,7 +95,7 @@ class ObjectWrapper(Sendable):
 
         return classname, va, fn
 
-    def toJSONDict(self):
+    def to_json(self):
         cls, va, fn = self.items()
         return {"id": self.ref(), "cls": cls, "va": va, "fn": fn}
 

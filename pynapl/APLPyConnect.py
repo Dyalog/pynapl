@@ -421,7 +421,7 @@ class Connection:
                 .replace("⋄)", ")")
             )
 
-            payload = APLArray.from_python([aplexpr, args], apl=self).toJSONString()
+            payload = APLArray.from_python([aplexpr, args], apl=self).dumps()
             Message(Message.EVAL, payload).send(self.conn.outfile)
 
             reply = self.conn.expect(Message.EVALRET)
@@ -628,7 +628,7 @@ class Connection:
                 if not isinstance(val[[1]], APLArray) or len(val[[1]].rho) != 1:
                     raise MalformedMessage("Argument list must be rank-1 array.")
 
-                result = PyEvaluator(code, args, self).go().toJSONString()
+                result = PyEvaluator(code, args, self).go().dumps()
                 Message(Message.EVALRET, result).send(self.outfile)
             except Exception as e:
                 # raise
@@ -643,7 +643,7 @@ class Connection:
                 print("---------------")
 
                 aplarr = APLArray.fromJSONString(message.data)
-                serialized = aplarr.toJSONString()
+                serialized = aplarr.dumps()
 
                 print("Sending back: ", serialized)
                 print("---------------")
