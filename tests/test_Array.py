@@ -1,18 +1,9 @@
-# -*- coding: utf-8 -*-
-
-from __future__ import absolute_import, division, unicode_literals
-
 import random
-import sys
 import unittest
+from math import prod
 
-from .. import APL
-from ..Array import *
-from ..Util import *
-
-if sys.version_info.major >= 3:
-    # have a known generator in both versions w/o affecting anything else
-    xrange = range
+from pynapl import APL
+from pynapl.Array import APLArray
 
 
 def makeRandomArray():
@@ -28,7 +19,7 @@ def makeRandomArray():
 
     # generate some random data
     data = []
-    for _ in range(product(rho)):
+    for _ in range(prod(rho)):
         data.append(random.randint(0, 100))
 
     # generate array
@@ -151,4 +142,4 @@ class TestConversion(unittest.TestCase):
             self.assertEqual(identity(True), 1)
 
         with self.subTest(msg="Iterables turn up as lists"):
-            self.assertEqual(identity(xrange(5)), [0, 1, 2, 3, 4])
+            self.assertEqual(identity(range(5)), [0, 1, 2, 3, 4])

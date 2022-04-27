@@ -4,7 +4,7 @@ import os
 import platform
 import signal
 
-import WinDyalog
+from . import WinDyalog
 
 
 def interrupt(pid):

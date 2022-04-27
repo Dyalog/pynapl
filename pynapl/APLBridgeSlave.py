@@ -6,8 +6,8 @@ import signal
 import sys
 import threading
 
-import APLPyConnect as C
-import IPC
+from . import APLPyConnect as C
+from . import IPC
 
 
 def runSlave(inp, outp):

@@ -13,10 +13,10 @@ import sys
 import time
 import types
 
-import Interrupt
-import IPC
-import RunDyalog
-import WinDyalog
+from . import Interrupt
+from . import IPC
+from . import RunDyalog
+from . import WinDyalog
 
 from .Array import APLArray
 from .ObjectWrapper import ObjectStore, ObjectWrapper
