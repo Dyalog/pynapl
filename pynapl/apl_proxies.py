@@ -52,6 +52,14 @@ class ReceivableMixin(ABC):
 class APLNamespace(APLProxy, SendableMixin, ReceivableMixin):
     """Proxy for APL namespaces, which are emulated as dictionaries with string keys."""
 
+    @classmethod
+    def from_python(cls, obj: dict[str, Any]) -> APLNamespace:
+        raise NotImplementedError()
+
+    @classmethod
+    def from_json(cls, json: dict[str, Any]) -> APLNamespace:
+        raise NotImplementedError()
+
 
 class APLArray(APLProxy, SendableMixin, ReceivableMixin):
     """Proxy for APL arrays, which are emulated as (nested) lists."""
