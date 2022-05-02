@@ -21,27 +21,51 @@ except ImportError:
 T = TypeVar("T")
 
 
-class Sendable(ABC):
-    """Class to be inherited by objects that we want to be able to send to APL.
+class APLProxy(ABC):
+    """Base class for all objects that can be used to proxy APL entities.
 
-    Sendables know how to convert to JSON-like Python dictionaries with string keys
-    and with values that the module json knows how to convert."""
+    An APLProxy object is an object that provides a Python interface that emulates
+    the native APL behaviour with respect to some APL built-in.
+    For example, APL has native support for multi-dimensional arrays while Python has not.
+    Thus, we provide APLArray as a proxy for APL's arrays.
+
+    Subclasses of APLProxy must provide the appropriate class method that builds
+    the given type of APL proxy from the supported Python objects.
+    """
+
+    def __new__(cls, obj: Any) -> APLProxy:
+        """Construct an appropriate APLProxy for the given Python object."""
+
+        if cls is APLProxy:
+            raise NotImplementedError()
+        return cls.from_python(obj)
+
+    @classmethod
+    @abstractmethod
+    def from_python(cls, obj: Any) -> APLProxy:
+        """Build the APL proxy that best represents the given Python object."""
+        raise NotImplementedError()
+
+    def to_python(self) -> Any:
+        """Build the closest native Python representation of the given APLProxy."""
+        raise NotImplementedError()
+
+
+class SendableMixin(ABC):
+    """Mixin for the APL proxy objects that can be sent to APL."""
 
     @abstractmethod
     def to_json(self) -> dict[str, Any]:
         """Converts a Sendable object to a JSON-like dictionary."""
         raise NotImplementedError()
 
-    def dumps(self) -> str:
-        """Converts a Sendable object to a JSON string."""
-        return json.dumps(self.to_json(), cls=ArrayEncoder, ensure_ascii=False)
 
+class ReceivableMixin(ABC):
+    """Mixin for the APL proxy objects that can be received directly from APL."""
 
-class Receivable(ABC):
-    """Class to be inherited by objects that we might receive from APL."""
-
+    @classmethod
     @abstractmethod
-    def to_python(self, apl=None):
+    def from_json(cls, json: dict[str, Any]) -> APLProxy:
         raise NotImplementedError()
 
 
