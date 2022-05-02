@@ -4,8 +4,7 @@ from typing import Any
 
 import pytest
 
-from pynapl.apl_proxies import APLProxy, APLNamespace
-
+from pynapl.apl_proxies import APLNamespace, APLProxy
 
 SIMPLE_DICTIONARIES_FOR_PARAMETRIZATION: list[dict[str, Any]] = [
     {},

@@ -16,14 +16,16 @@ class APLProxy:
     the given type of APL proxy from the supported Python objects.
     """
 
-    def __new__(cls, obj: Any) -> APLProxy:
+    def __new__(cls, *args, **kwargs) -> APLProxy:
         """Construct an appropriate APLProxy for the given Python object."""
+        print(f"APLProxy __new__ {cls = }")
 
-        return cls.from_python(obj)
+        return cls.from_python(*args, **kwargs)
 
     @classmethod
     def from_python(cls, obj: Any) -> APLProxy:
         """Build the APL proxy that best represents the given Python object."""
+        print(f"APLProxy from_python {cls = }")
         raise NotImplementedError()
 
     def to_python(self) -> Any:
@@ -54,11 +56,20 @@ class APLNamespace(APLProxy, SendableMixin, ReceivableMixin):
 
     @classmethod
     def from_python(cls, obj: dict[str, Any]) -> APLNamespace:
+        self = object.__new__(cls)
+        for attr, value in obj.items():
+            setattr(self, attr, value)
+        return self
+
+    def to_python(self) -> dict[str, Any]:
         raise NotImplementedError()
 
     @classmethod
     def from_json(cls, json: dict[str, Any]) -> APLNamespace:
         raise NotImplementedError()
+
+    def to_json(self) -> dict[str, Any]:
+        return vars(self)
 
 
 class APLArray(APLProxy, SendableMixin, ReceivableMixin):
