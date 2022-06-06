@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Iterable
 
 import pytest
 
-from pynapl.apl_proxies import APLNamespace, APLProxy
+from pynapl.proxies import APLArray, APLNamespace, APLProxy, dumps, loads
+
 
 SIMPLE_DICTIONARIES_FOR_PARAMETRIZATION: list[dict[str, Any]] = [
     {},
@@ -15,21 +16,62 @@ SIMPLE_DICTIONARIES_FOR_PARAMETRIZATION: list[dict[str, Any]] = [
 
 
 @pytest.mark.parametrize("dict_", SIMPLE_DICTIONARIES_FOR_PARAMETRIZATION)
-def test_dict_proxy_creation(dict_):
-    """Tests that dictionaries are converted to APLNamespace APL proxy objects."""
+def test_dict_proxy_creation(dict_: dict[str, Any]):
+    """Tests that dictionaries are converted to APLNamespace objects."""
     assert isinstance(APLProxy(dict_), APLNamespace)
 
 
 @pytest.mark.parametrize("dict_", SIMPLE_DICTIONARIES_FOR_PARAMETRIZATION)
-def test_APLNamespace_python_roundtrip(dict_):
+def test_APLNamespace_python_roundtrip(dict_: dict[str, Any]):
     """Make sure dicts converted to APL proxies and back are round tripped."""
-    assert APLProxy(dict_).to_python() == dict_
+    assert APLNamespace.from_python(dict_).to_python() == dict_
 
 
-def test_APLNamespace_json_roundtrip(dict_):
+@pytest.mark.parametrize("dict_", SIMPLE_DICTIONARIES_FOR_PARAMETRIZATION)
+def test_APLNamespace_json_roundtrip(dict_: dict[str, Any]):
     """Make sure APLNamespace objects converted to/from JSON roundtrip properly."""
 
     ns = APLNamespace.from_python(dict_)
-    assert APLNamespace.from_json(APLNamespace.from_python(dict_).to_json()) == ns
-    ns_json = ns.to_json()
-    assert APLNamespace.from_json(ns_json).to_json() == ns
+    assert loads(dumps(ns)) == ns
+    ns_json = dumps(ns)
+    assert dumps(loads(ns_json)) == ns_json
+
+
+SIMPLE_ITERABLES_FOR_PARAMETRIZATION: list[Iterable] = [
+    range(10),
+    [5, 6, 7, 8],
+    (-3, True, 73, False),
+    "Hello, world!",
+]
+
+
+@pytest.mark.parametrize("iter_", SIMPLE_ITERABLES_FOR_PARAMETRIZATION)
+def test_iterable_proxy_creation(iter_: Iterable):
+    """Tests that iterables are converted to APLArray objects."""
+    assert isinstance(APLProxy(iter_), APLArray)
+
+
+@pytest.mark.parametrize("iter_", SIMPLE_ITERABLES_FOR_PARAMETRIZATION)
+def test_APLArray_python_data_roundtrip(iter_: Iterable):
+    """Make sure iterables converted to APL proxies and back round trip the data."""
+    assert APLArray.from_python(iter_).to_python() == list(iter_)
+
+
+@pytest.mark.parametrize("iter_", SIMPLE_ITERABLES_FOR_PARAMETRIZATION)
+def test_APLArray_json_roundtrip(iter_: Iterable):
+    """Make sure APLArray objects converted to/from JSON roundtrip properly."""
+
+    ns = APLArray.from_python(iter_)
+    assert loads(dumps(ns)) == ns
+    ns_json = dumps(ns)
+    assert dumps(loads(ns_json)) == ns_json
+
+
+def test_APLArray_creation_with_nesting():
+    """Make sure APLArray behaves appropriately for nested Python iterables."""
+
+    data = [[True, False, True], [], [1, 2, [3, 4, [5, 6]]]]
+    arr = APLArray.from_python(data)
+    assert arr.to_python() == data
+    arr_json = dumps(arr)
+    assert dumps(loads(arr_json)) == arr_json
