@@ -1,74 +1,12 @@
 from __future__ import annotations
 
-import collections
-import json
-from abc import ABC, abstractmethod
 from math import prod
 from typing import Any, Dict, Iterable, NewType
 
+import extendedjson as xjson
+
 
 JSONDict = NewType("JSONDict", Dict[str, Any])
-
-
-class JSONAware(ABC):
-    """Mixin for Python objects that can be converted to and from JSON."""
-
-    def to_json(self) -> JSONDict:
-        """Converts an object to a JSON-serialisable dictionary.
-
-        This function should not be overridden by subclasses;
-        instead, subclasses should override `_to_json`.
-        This class makes sure that the JSON-serialisable dictionary
-        has the format needed so that the JSON can be loaded back as Python.
-        """
-
-        json_dict = self._to_json()
-        print(type(self))
-        json_dict["__json_aware_cls__"] = type(self).__name__
-        return json_dict
-
-    @abstractmethod
-    def _to_json(self) -> JSONDict:
-        """Converts an object to a JSON-serialisable dictionary."""
-        raise NotImplementedError()
-
-    @classmethod
-    @abstractmethod
-    def from_json(cls, json: JSONDict) -> JSONAware:
-        """Turns a JSON-like dictionary into the corresponding JSONAware object.
-
-        Typically, this function isn't called directly.
-        It is the JSON decoder's responsibility to call this function when needed.
-        The only argument to this function is the JSON-like dictionary that represents
-        the JSON-serialisable version of an object of the current type.
-        """
-        raise NotImplementedError()
-
-
-class JSONAwareEncoder(json.JSONEncoder):
-    """JSON encoder for all objects that are JSONAware."""
-
-    def default(self, obj: Any) -> JSONDict:
-        if isinstance(obj, JSONAware):
-            return obj.to_json()
-
-        return super().default(obj)
-
-
-class JSONAwareDecoder(json.JSONDecoder):
-    """JSON decoder for representations of JSONAware objects."""
-
-    def __init__(self, **kwargs):
-        kwargs["object_hook"] = self.object_hook
-        super().__init__(**kwargs)
-
-    def object_hook(self, obj: JSONDict) -> JSONAware | JSONDict:
-        try:
-            cls = globals()[obj["__json_aware_cls__"]]
-        except KeyError:
-            return obj
-        else:
-            return cls.from_json(obj)
 
 
 class APLProxy:
@@ -83,7 +21,7 @@ class APLProxy:
     the given type of APL proxy from the supported Python objects.
     """
 
-    def __new__(cls, obj: Any) -> APLProxy | int | float:
+    def __new__(cls, obj: Any, *args, **kwargs) -> APLProxy | int | float:
         """Construct an appropriate APLProxy for the given Python object.
 
         This will leave some basic types unchanged, like integers, because those
@@ -93,10 +31,10 @@ class APLProxy:
         if isinstance(obj, (int, float)):
             return obj
         elif isinstance(obj, dict):
-            return APLNamespace.from_python(obj)
+            return APLNamespace.from_python(obj, *args, **kwargs)
         elif isinstance(obj, Iterable):
-            return APLArray.from_python(obj)
-        return cls.from_python(obj)
+            return APLArray.from_python(obj, *args, **kwargs)
+        return cls.from_python(obj, *args, **kwargs)
 
     @classmethod
     def from_python(cls, obj: Any) -> APLProxy:
@@ -108,7 +46,7 @@ class APLProxy:
         raise NotImplementedError()
 
 
-class APLNamespace(APLProxy, JSONAware):
+class APLNamespace(APLProxy):
     """Proxy for APL namespaces, which are emulated as dictionaries with string keys.
 
     When creating APLNamespace proxies from Python dictionaries, keep in mind that
@@ -141,33 +79,6 @@ class APLNamespace(APLProxy, JSONAware):
 
         return dict_
 
-    def _to_json(self) -> JSONDict:
-        """Convert the APL namespace proxy into a JSON-serialisable object.
-
-        Because APL namespaces can contain arbitrary objects as the values associated
-        with string keys, we need to traverse the data of the namespace and ensure
-        we convert it to a JSON-serialisable object when needed.
-        """
-
-        json_data: Any = {}
-        for key, value in self.__dict__.items():
-            print(f"{key = } {value = }")
-            if isinstance(value, JSONAware):
-                json_data[key] = value.to_json()
-                continue
-
-            json_data[key] = value
-
-        return JSONDict({"__dict__": json_data})
-
-    @classmethod
-    def from_json(cls, json: dict[str, Any]) -> APLNamespace:
-        """"""
-        self = object.__new__(cls)
-        for key, value in json["__dict__"].items():
-            setattr(self, key, value)
-        return self
-
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.__dict__})"
 
@@ -176,7 +87,7 @@ class APLNamespace(APLProxy, JSONAware):
         return isinstance(other, type(self)) and self.__dict__ == other.__dict__
 
 
-class APLArray(APLProxy, JSONAware):
+class APLArray(APLProxy):
     """Proxy for APL arrays, which are emulated as (nested) lists."""
 
     shape: list[int]
@@ -231,27 +142,8 @@ class APLArray(APLProxy, JSONAware):
                 for i in range(self.shape[0])
             ]
 
-    def _to_json(self) -> JSONDict:
-        return JSONDict(
-            {
-                "shape": self.shape,
-                "data": [
-                    value.to_json() if isinstance(value, JSONAware) else value
-                    for value in self.data
-                ],
-            }
-        )
-
-    @classmethod
-    def from_json(cls, json: JSONDict) -> APLArray:
-        self = object.__new__(cls)
-        self.shape = json["shape"]
-        self.data = json["data"]
-        if prod(json["shape"]) != len(json["data"]):
-            raise ValueError(
-                f"{cls} shape {self.shape} and data length {prod(self.shape)} mismatch."
-            )
-        return self
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self.data}, {self.shape})"
 
     def __eq__(self, other: Any) -> bool:
         return (
@@ -261,30 +153,47 @@ class APLArray(APLProxy, JSONAware):
         )
 
 
-def load(*args, **kwargs):
-    """`json.load` stub using the custom JSONAwareDecoder."""
-    kwargs.setdefault("cls", JSONAwareDecoder)
-    return json.load(*args, **kwargs)
+@xjson.register_encoder
+class PynAPLEncoder(xjson.ExtendedEncoder):
+    def encode_complex(self, c: complex) -> JSONDict:
+        return JSONDict({"real": c.real, "imag": c.imag})
+
+    def encode_APLNamespace(self, ns: APLNamespace) -> JSONDict:
+        return JSONDict(
+            {
+                "ns": {
+                    key: self.default(value) if isinstance(value, APLProxy) else value
+                    for key, value in ns.__dict__.items()
+                }
+            }
+        )
+
+    def encode_APLArray(self, array: APLArray) -> JSONDict:
+        return JSONDict(
+            {
+                "shape": array.shape,
+                "data": [
+                    self.default(value) if isinstance(value, APLProxy) else value
+                    for value in array.data
+                ],
+            }
+        )
 
 
-def loads(*args, **kwargs):
-    kwargs.setdefault("cls", JSONAwareDecoder)
-    return json.loads(*args, **kwargs)
+@xjson.register_decoder
+class PynAPLDecoder(xjson.ExtendedDecoder):
+    def decode_complex(self, obj: JSONDict) -> complex:
+        return complex(float(obj["real"]), float(obj["imag"]))
 
+    def decode_APLNamespace(self, obj: JSONDict) -> APLNamespace:
+        return APLNamespace.from_python(obj["ns"])
 
-def dump(*args, **kwargs):
-    kwargs.setdefault("cls", JSONAwareEncoder)
-    return json.dump(*args, **kwargs)
-
-
-def dumps(*args, **kwargs):
-    kwargs.setdefault("cls", JSONAwareEncoder)
-    return json.dumps(*args, **kwargs)
+    def decode_APLArray(self, obj: JSONDict) -> APLArray:
+        return APLArray.from_python(obj["data"], obj["shape"])
 
 
 if __name__ == "__main__":
     ns_ = APLNamespace({"hey": 73, "bool": True})
-    ns = APLNamespace({"ho": 1, "ns": ns_})
-    print(ns)
-    print(s := dumps(ns))
-    print(loads(s))
+    ns = APLNamespace({"ho": 1, "sub_ns": ns_})
+    print(s := xjson.dumps(ns))
+    print(xjson.loads(s))
