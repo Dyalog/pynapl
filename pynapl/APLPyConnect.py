@@ -5,7 +5,6 @@
 #   TYPE  SIZE (big-endian)  MESSAGE (`size` bytes, expected to be UTF-8 encoded)
 
 
-import json
 import os
 import platform
 import signal
@@ -13,12 +12,15 @@ import sys
 import time
 import types
 
+import extendedjson as xjson
+
 from . import Interrupt
 from . import IPC
 from . import RunDyalog
 from . import WinDyalog
 
 from .Array import APLArray, ObjectStore, ObjectWrapper
+from .proxies import APLProxy
 from .PyEvaluator import PyEvaluator
 
 
@@ -60,7 +62,7 @@ class APLError(Exception):
         if not jsobj is None:
             if isinstance(jsobj, bytes):
                 jsobj = str(jsobj, "utf-8")
-            errobj = json.loads(jsobj)
+            errobj = xjson.loads(jsobj)
             message = errobj["Message"]
             if "DMX" in errobj:
                 self.dmx = errobj["DMX"]
@@ -420,7 +422,8 @@ class Connection:
                 .replace("⋄)", ")")
             )
 
-            payload = APLArray.from_python([aplexpr, args], apl=self).dumps()
+            payload = xjson.dumps(APLProxy([aplexpr, args]))
+            # payload = APLArray.from_python([aplexpr, args], apl=self).dumps()
             Message(Message.EVAL, payload).send(self.conn.outfile)
 
             reply = self.conn.expect(Message.EVALRET)
@@ -428,7 +431,7 @@ class Connection:
             if reply.type == Message.ERR:
                 raise APLError(jsobj=reply.data)
 
-            answer = APLArray.fromJSONString(reply.data)
+            answer = xjson.loads(reply.data)
 
             if "raw" in kwargs and kwargs["raw"]:
                 return answer
@@ -606,7 +609,7 @@ class Connection:
             sig = None
             try:
                 sig = allowInterrupts()
-                val = APLArray.fromJSONString(message.data)
+                val = xjson.loads(message.data)
                 # unpack code
                 if val.rho != [2]:
                     raise MalformedMessage(
@@ -641,7 +644,7 @@ class Connection:
                 print("Received data: ", message.data)
                 print("---------------")
 
-                aplarr = APLArray.fromJSONString(message.data)
+                aplarr = xjson.loads(message.data)
                 serialized = aplarr.dumps()
 
                 print("Sending back: ", serialized)
