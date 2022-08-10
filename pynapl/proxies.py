@@ -143,7 +143,7 @@ class APLArray(APLProxy):
             ]
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.data}, {self.shape})"
+        return f"{type(self).__name__}({self.shape}, {self.data})"
 
     def __eq__(self, other: Any) -> bool:
         return (
@@ -197,3 +197,8 @@ if __name__ == "__main__":
     ns = APLNamespace({"ho": 1, "sub_ns": ns_})
     print(s := xjson.dumps(ns))
     print(xjson.loads(s))
+    print(
+        xjson.loads(
+            '{"__extended_json_type__":"APLNamespace","ns":{"banana":42,"string":{"__extended_json_type__":"APLArray","data":"caracas","shape":[7]},"subns":{"__extended_json_type__":"APLNamespace","ns":{}},"vector":{"__extended_json_type__":"APLArray","data":[0,1,2,3,4,5,6,7,8,9],"shape":[10]}}}'
+        )
+    )
