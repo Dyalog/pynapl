@@ -327,7 +327,7 @@
           :Implements Constructor
           nc←IsNetCore
           ⎕USING←(1+nc)⊃'System.Diagnostics,System.dll' 'System.Diagnostics,System.Diagnostics.Process'
-          ⎕USING,←(1+nc)⊃'Microsoft.Win32,mscorlib.dll' ''
+          ⎕USING,←(1+nc)⌷'Microsoft.Win32,mscorlib.dll' ''
         ∇
 
         ∇ r←IsNetCore;errors;success;type

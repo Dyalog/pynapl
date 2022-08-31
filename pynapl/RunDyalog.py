@@ -75,9 +75,10 @@ def win_dythread(dyalog, cygwin=False):
     if cygwin: path=cyg_convert_path(path, b"--windows") 
     
     dyalog = pystr(dyalog)
-    arg = pystr(b'DYAPP=' + path)
+    dyapp = pystr(b'DYAPP=' + path)
+    quiet = pystr(b'RIDE_SPAWNED=1') # Do not show session. Start in system tray
     
-    x=Popen([dyalog, arg], startupinfo=startupinfo,
+    x=Popen([dyalog, dyapp, quiet], startupinfo=startupinfo,
           preexec_fn=preexec_fn)
     x.communicate()
     
