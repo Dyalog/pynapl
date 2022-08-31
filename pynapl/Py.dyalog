@@ -310,14 +310,10 @@
         ⍝ Functions to interface with Windows using .NET
         ⍝ NOTE: will keep track of the process itself rather than use the pid as in Linux
 
-    :Using System.Diagnostics,System.dll
-    :Using Microsoft.Win32,mscorlib.dll
-
         :Field Private Instance pyProcess←⍬
 
         ∇ r←GetPID
           :Access Public Instance
-          :If 0=⎕NC'Process' ⋄ Process←Diagnostics.Process ⋄ :EndIf
           r←Process.GetCurrentProcess.Id
         ∇
 
@@ -326,10 +322,12 @@
           r←(⌽∨\⌽'\'=fname)/fname
         ∇
 
-        ∇ SetUsing
+        ∇ SetUsing;nc
           :Access public
           :Implements Constructor
-          ⎕USING←(1+IsNetCore)⊃'System,System.dll' 'System,System.Diagnostics.Process'
+          nc←IsNetCore
+          ⎕USING←(1+nc)⊃'System.Diagnostics,System.dll' 'System.Diagnostics,System.Diagnostics.Process'
+          ⎕USING,←(1+nc)⊃'Microsoft.Win32,mscorlib.dll' ''
         ∇
 
         ∇ r←IsNetCore;errors;success;type
