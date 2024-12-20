@@ -43,7 +43,7 @@ def posix_dythread(inf, outf, dyalog=b"dyalog"):
     path = to_bytes(os.path.dirname(SCRIPTFILE)) + b"/Py.dyalog"
 
     # Run the Dyalog instance in this thread
-    p = Popen([dyalog, b"-script"], stdin=PIPE, preexec_fn=os.setpgrp)
+    p = Popen([dyalog], stdin=PIPE, preexec_fn=os.setpgrp)
     s = script % (pystr(ipcpath), pystr(path), inf, outf)
     p.communicate(input=s.encode("utf8"))
 
