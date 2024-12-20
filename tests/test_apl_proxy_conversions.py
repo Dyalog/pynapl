@@ -4,7 +4,8 @@ from typing import Any, Iterable
 
 import pytest
 
-from pynapl.proxies import APLArray, APLNamespace, APLProxy, dumps, loads
+from pynapl.proxies import APLArray, APLNamespace, APLProxy
+import extendedjson as xjson
 
 
 SIMPLE_DICTIONARIES_FOR_PARAMETRIZATION: list[dict[str, Any]] = [
@@ -32,9 +33,9 @@ def test_APLNamespace_json_roundtrip(dict_: dict[str, Any]):
     """Make sure APLNamespace objects converted to/from JSON roundtrip properly."""
 
     ns = APLNamespace.from_python(dict_)
-    assert loads(dumps(ns)) == ns
-    ns_json = dumps(ns)
-    assert dumps(loads(ns_json)) == ns_json
+    assert xjson.loads(xjson.dumps(ns)) == ns
+    ns_json = xjson.dumps(ns)
+    assert xjson.dumps(xjson.loads(ns_json)) == ns_json
 
 
 SIMPLE_ITERABLES_FOR_PARAMETRIZATION: list[Iterable] = [
@@ -61,10 +62,10 @@ def test_APLArray_python_data_roundtrip(iter_: Iterable):
 def test_APLArray_json_roundtrip(iter_: Iterable):
     """Make sure APLArray objects converted to/from JSON roundtrip properly."""
 
-    ns = APLArray.from_python(iter_)
-    assert loads(dumps(ns)) == ns
-    ns_json = dumps(ns)
-    assert dumps(loads(ns_json)) == ns_json
+    ns = APLArray.from_python(iter_).to_python()
+    assert xjson.loads(xjson.dumps(ns)) == ns
+    ns_json = xjson.dumps(ns)
+    assert xjson.dumps(xjson.loads(ns_json)) == ns_json
 
 
 def test_APLArray_creation_with_nesting():
@@ -73,5 +74,5 @@ def test_APLArray_creation_with_nesting():
     data = [[True, False, True], [], [1, 2, [3, 4, [5, 6]]]]
     arr = APLArray.from_python(data)
     assert arr.to_python() == data
-    arr_json = dumps(arr)
-    assert dumps(loads(arr_json)) == arr_json
+    arr_json = xjson.dumps(arr.to_python())
+    assert xjson.dumps(xjson.loads(arr_json)) == arr_json

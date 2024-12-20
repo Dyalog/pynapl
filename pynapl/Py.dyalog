@@ -104,7 +104,7 @@
             ⍝ if not a simple object or a namespace,
             ⍝ it must then be an array
 
-            :If (0=≢obj.d)∧0≠⎕NC'obj.t'
+            :If (0=≢obj.data)∧0≠⎕NC'obj.t'
                 ⍝ empty array with type hint
                 :If 0=obj.t
                     r←obj.r⍴⍬
@@ -115,7 +115,7 @@
                 :EndIf
             :Else
                 ⍝ otherwise, reconstruct the array as given
-                r←obj.r⍴(pyclass∘decode)¨⊃¨obj.d
+                r←obj.shape⍴(pyclass∘decode)¨⊃¨obj.data
             :EndIf
         ∇
 

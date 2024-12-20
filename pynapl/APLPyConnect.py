@@ -431,12 +431,11 @@ class Connection:
             if reply.type == Message.ERR:
                 raise APLError(jsobj=reply.data)
 
-            answer = xjson.loads(reply.data)
-
-            if "raw" in kwargs and kwargs["raw"]:
-                return answer
-            else:
-                return answer.to_python(self)
+            return (
+                xjson.loads(reply.data)
+                if "raw" in kwargs and kwargs["raw"]
+                else APLArray.fromJSONString(reply.data).to_python(self)
+            )
 
     @staticmethod
     def APLClient(DEBUG=False, dyalog=None, forceTCP=False):

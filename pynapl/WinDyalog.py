@@ -2,7 +2,7 @@
 
 import os
 import threading
-from ctypes import byref, c_uint, cdll, create_unicode_buffer, windll
+from ctypes import byref, c_uint, cdll, create_unicode_buffer
 from subprocess import PIPE, Popen
 
 pidMainWindows = {}
@@ -25,7 +25,7 @@ def from_bytes(x):
 
 # find the library
 try:
-    user32 = windll.user32
+    user32 = LibraryLoader(WinDLL).user32
 except NameError:
     # this might be Cygwin
     try:

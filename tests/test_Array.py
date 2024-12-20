@@ -73,9 +73,7 @@ class TestArraySerializer(unittest.TestCase):
     def test_serializer(self):
         """Test that serializing and deserializing an APLArray gives the same
         array back."""
-        self.assertEqual(
-            self.cplx_arr, APLArray.fromJSONString(self.cplx_arr.dumps())
-        )
+        self.assertEqual(self.cplx_arr, APLArray.fromJSONString(self.cplx_arr.dumps()))
 
 
 class TestArray(unittest.TestCase):
