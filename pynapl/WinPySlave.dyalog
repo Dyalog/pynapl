@@ -5,17 +5,17 @@
 :Namespace WinPySlave
 
     ⎕IO ⎕ML←1
-    
+
     ∇ Go
-        :If 0=⎕NC'#.Py'
-            ⎕←'ERROR: Py did not load.'
-        :ElseIf 0=⎕NC'#.WinPort'
-            ⎕←'ERROR: WinPort did not load.'
-        :Else 
+      :If 0=⎕NC'#.Py'
+          ⎕←'ERROR: Py did not load.'
+      :ElseIf 0=⎕NC'#.WinPort'
+          ⎕←'ERROR: WinPort did not load.'
+      :Else
             ⍝ only TCP for now
-            #.Py.StartAPLSlave 'TCP' #.WinPort.port
-            ⎕OFF
-        :EndIf
+          #.Py.StartAPLSlave'TCP'#.WinPort.port
+          ⎕OFF
+      :EndIf
     ∇
-    
+
 :EndNamespace
