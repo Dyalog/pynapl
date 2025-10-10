@@ -202,6 +202,13 @@
                     ⍝ it is a normal number or character
                   r←obj
               :EndIf
+          ⍝ fast path for simple (as in flat), non-complex (as in real) arrays
+          ⍝ for the meaning of these constants, see https://help.dyalog.com/19.0/Content/Language/System%20Functions/Data%20Representation%20Monadic.htm#DataRepresentation(Monadic)
+          :ElseIf (⎕DR obj)∊11 80 83 160 163 320 323 645 1287
+              r←⎕NS''
+              r.r←⍴obj
+              r.d←,obj
+              addTypeHint r
           :Else
          
                 ⍝ the object is some kind of array,
