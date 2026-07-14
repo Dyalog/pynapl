@@ -16,7 +16,13 @@ The APL side of the interface is located in `Py.dyalog`.
 It can be loaded into the workspace using:
 
 ```apl
-]load Py
+2⎕FIX'/path/to/pynapl/Py.dyalog'
+```
+
+Or using Link if .NET is available
+
+```apl
+]Link.Create Py /path/to/pynapl/Py.dyalog
 ```
 
 Note that it expects the included Python scripts to be

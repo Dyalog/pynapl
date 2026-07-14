@@ -1,4 +1,4 @@
-﻿⍝∇:require =/IPC.dyalog
+﻿:Require file://IPC.dyalog
 :Namespace Py
     ⎕IO ⎕ML←1
 
