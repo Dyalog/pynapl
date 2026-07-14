@@ -206,7 +206,8 @@ class APLArray(Sendable, Receivable):
         elif len(self.rho)==1: # array
             # if the type hint says characters, and the array is simple, return a string
             if self.genTypeHint() == APLArray.TYPE_HINT_CHAR \
-            and not any(isinstance(x, (Sendable, Receivable)) for x in self.data):
+            and not any(isinstance(x, (Sendable, Receivable)) for x in self.data)\
+            and all(isinstance(x, str) for x in self.data):
                 return ''.join(self.data)
 
             # if not, return a list. If this is a nested array that _does_ have a simple
